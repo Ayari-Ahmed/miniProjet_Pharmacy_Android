@@ -1,0 +1,48 @@
+package tn.rnu.isetr.miniprojet.data
+
+data class Pharmacy(
+    val _id: String,
+    val name: String,
+    val address: String,
+    val phone: String,
+    val email: String? = null,
+    val latitude: Double,
+    val longitude: Double,
+    val rating: Double = 0.0,
+    val totalReviews: Int = 0,
+    val stock: List<PharmacyStock> = emptyList(),
+    val isActive: Boolean = true,
+    val services: List<String> = emptyList()
+)
+
+data class PharmacyStock(
+    val medicine: Medicine,
+    val stock: Int,
+    val price: Double,
+    val lastUpdated: String? = null
+)
+
+data class Medicine(
+    val _id: String,
+    val name: String,
+    val genericName: String? = null,
+    val description: String? = null,
+    val category: String? = null,
+    val requiresPrescription: Boolean = false,
+    val price: Double = 0.0,
+    val imageUrl: String? = null
+)
+
+data class PharmacyResponse(
+    val success: Boolean,
+    val data: List<Pharmacy>,
+    val pagination: Pagination? = null,
+    val message: String? = null
+)
+
+data class Pagination(
+    val page: Int,
+    val limit: Int,
+    val total: Int,
+    val pages: Int
+)
