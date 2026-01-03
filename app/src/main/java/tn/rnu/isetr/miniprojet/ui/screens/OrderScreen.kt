@@ -17,12 +17,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.util.GeoPoint
@@ -34,6 +37,12 @@ import tn.rnu.isetr.miniprojet.data.Pharmacy
 import tn.rnu.isetr.miniprojet.data.PharmacyStock
 import tn.rnu.isetr.miniprojet.viewmodel.OrderState
 import tn.rnu.isetr.miniprojet.viewmodel.OrderViewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.core.content.FileProvider
+import java.io.File
+import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,8 +58,29 @@ fun OrderScreen(
     var showSuccessDialog by remember { mutableStateOf(false) }
     var showMapPicker by remember { mutableStateOf(false) }
     var selectedLocation by remember { mutableStateOf<GeoPoint?>(null) }
+    var prescriptionUri by remember { mutableStateOf<Uri?>(null) }
+    var showPrescriptionDialog by remember { mutableStateOf(false) }
 
     val orderState by viewModel.orderState.collectAsState()
+    val context = LocalContext.current
+
+    // Camera launcher
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+        onResult = { success ->
+            if (success) {
+                // prescriptionUri is already set
+            }
+        }
+    )
+
+    // Gallery launcher
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            prescriptionUri = uri
+        }
+    )
 
     // Handle order success
     LaunchedEffect(orderState) {
@@ -66,6 +96,12 @@ fun OrderScreen(
     val totalPrice = selectedItems.entries.sumOf { (medicineId, quantity) ->
         val stockItem = pharmacy.stock.find { it.medicine._id == medicineId }
         (stockItem?.price ?: 0.0) * quantity
+    }
+
+    // Check if any selected medicine requires prescription
+    val requiresPrescription = selectedItems.keys.any { medicineId ->
+        val stockItem = pharmacy.stock.find { it.medicine._id == medicineId }
+        stockItem?.medicine?.requiresPrescription == true
     }
 
     Column(
@@ -256,6 +292,69 @@ fun OrderScreen(
                 }
             }
 
+            // Prescription Section
+            if (requiresPrescription) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Prescription Required",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            if (prescriptionUri != null) {
+                                AsyncImage(
+                                    model = prescriptionUri,
+                                    contentDescription = "Prescription",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp)
+                                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+
+                            Button(
+                                onClick = { showPrescriptionDialog = true },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (prescriptionUri != null) Color(0xFF10B981) else Color(0xFFEF4444)
+                                )
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        if (prescriptionUri != null) Icons.Default.Check else Icons.Default.Camera,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        if (prescriptionUri != null) "Change Prescription" else "Upload Prescription",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Order Summary
             if (totalItems > 0) {
                 item {
@@ -291,6 +390,111 @@ fun OrderScreen(
                                 )
                             }
                         }
+                    
+                        // Prescription Upload Dialog
+                        if (showPrescriptionDialog) {
+                            androidx.compose.ui.window.Dialog(
+                                onDismissRequest = { showPrescriptionDialog = false }
+                            ) {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(24.dp),
+                                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        Text(
+                                            text = "Upload Prescription",
+                                            fontSize = 20.sp,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                            color = Color(0xFF0F172A),
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                    
+                                        Text(
+                                            text = "Please upload a clear photo of your prescription for verification.",
+                                            fontSize = 14.sp,
+                                            color = Color(0xFF64748B),
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                    
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    val photoFile = File(context.cacheDir, "prescription_${System.currentTimeMillis()}.jpg")
+                                                    val photoUri = FileProvider.getUriForFile(
+                                                        context,
+                                                        "${context.packageName}.fileprovider",
+                                                        photoFile
+                                                    )
+                                                    prescriptionUri = photoUri
+                                                    cameraLauncher.launch(photoUri)
+                                                    showPrescriptionDialog = false
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(12.dp),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981))
+                                            ) {
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Camera,
+                                                        contentDescription = "Camera",
+                                                        tint = Color(0xFF10B981)
+                                                    )
+                                                    Text("Camera", color = Color(0xFF10B981), fontSize = 12.sp)
+                                                }
+                                            }
+                    
+                                            OutlinedButton(
+                                                onClick = {
+                                                    galleryLauncher.launch(
+                                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                    )
+                                                    showPrescriptionDialog = false
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(12.dp),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981))
+                                            ) {
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Image,
+                                                        contentDescription = "Gallery",
+                                                        tint = Color(0xFF10B981)
+                                                    )
+                                                    Text("Gallery", color = Color(0xFF10B981), fontSize = 12.sp)
+                                                }
+                                            }
+                                        }
+                    
+                                        OutlinedButton(
+                                            onClick = { showPrescriptionDialog = false },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF94A3B8))
+                                        ) {
+                                            Text("Cancel", color = Color(0xFF94A3B8), fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -299,15 +503,19 @@ fun OrderScreen(
             item {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val isValidOrder = totalItems > 0 && deliveryAddress.isNotBlank()
+                val isValidOrder = totalItems > 0 && deliveryAddress.isNotBlank() &&
+                    (!requiresPrescription || prescriptionUri != null)
 
                 Button(
                     onClick = {
                         if (deliveryAddress.isBlank()) {
                             // Open map picker if no address
                             showMapPicker = true
+                        } else if (requiresPrescription && prescriptionUri == null) {
+                            // Show prescription dialog if prescription is required but not uploaded
+                            showPrescriptionDialog = true
                         } else {
-                            // Place order if address is set
+                            // Place order if all requirements are met
                             val orderItems = selectedItems.map { (medicineId, quantity) ->
                                 OrderItem(medicineId, quantity)
                             }
@@ -315,7 +523,8 @@ fun OrderScreen(
                                 pharmacyId = pharmacy._id,
                                 items = orderItems,
                                 deliveryAddress = deliveryAddress,
-                                specialInstructions = specialInstructions.takeIf { it.isNotBlank() }
+                                specialInstructions = specialInstructions.takeIf { it.isNotBlank() },
+                                prescriptionUrl = prescriptionUri?.toString()
                             )
                         }
                     },

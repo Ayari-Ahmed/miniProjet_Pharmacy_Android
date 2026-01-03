@@ -18,7 +18,8 @@ class OrderViewModel : ViewModel() {
         deliveryAddress: String,
         deliveryLatitude: Double? = null,
         deliveryLongitude: Double? = null,
-        specialInstructions: String? = null
+        specialInstructions: String? = null,
+        prescriptionUrl: String? = null
     ) {
         _orderState.value = OrderState.Loading
         viewModelScope.launch {
@@ -29,7 +30,8 @@ class OrderViewModel : ViewModel() {
                     deliveryAddress = deliveryAddress,
                     deliveryLatitude = deliveryLatitude,
                     deliveryLongitude = deliveryLongitude,
-                    specialInstructions = specialInstructions
+                    specialInstructions = specialInstructions,
+                    prescriptionUrl = prescriptionUrl
                 )
 
                 val response = RetrofitClient.apiService.createOrder(orderRequest)

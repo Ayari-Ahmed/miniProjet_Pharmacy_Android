@@ -51,6 +51,7 @@ router.post('/', [
     // Check stock availability and calculate total
     let totalAmount = 0;
     const orderItems = [];
+    let requiresPrescription = false;
 
     for (const item of items) {
       const stockItem = pharmacy.stock.find(s =>
@@ -71,6 +72,12 @@ router.post('/', [
         });
       }
 
+      // Check if medicine requires prescription
+      const medicine = await require('../models/Medicine').findById(item.medicine);
+      if (medicine && medicine.requiresPrescription) {
+        requiresPrescription = true;
+      }
+
       orderItems.push({
         medicine: item.medicine,
         quantity: item.quantity,
@@ -79,6 +86,14 @@ router.post('/', [
       });
 
       totalAmount += stockItem.price * item.quantity;
+    }
+
+    // Validate prescription if required
+    if (requiresPrescription && !prescriptionUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Prescription is required for one or more medicines in this order'
+      });
     }
 
     // Create order
