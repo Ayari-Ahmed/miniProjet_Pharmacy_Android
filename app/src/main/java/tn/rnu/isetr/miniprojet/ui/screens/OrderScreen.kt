@@ -338,7 +338,7 @@ fun OrderScreen(
                                     horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
-                                        if (prescriptionUri != null) Icons.Default.Check else Icons.Default.Camera,
+                                        if (prescriptionUri != null) Icons.Default.Check else Icons.Default.Place,
                                         contentDescription = null,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -450,7 +450,7 @@ fun OrderScreen(
                                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                                 ) {
                                                     Icon(
-                                                        Icons.Default.Camera,
+                                                        Icons.Default.Add,
                                                         contentDescription = "Camera",
                                                         tint = Color(0xFF10B981)
                                                     )
@@ -474,7 +474,7 @@ fun OrderScreen(
                                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                                 ) {
                                                     Icon(
-                                                        Icons.Default.Image,
+                                                        Icons.Default.ShoppingCart,
                                                         contentDescription = "Gallery",
                                                         tint = Color(0xFF10B981)
                                                     )

@@ -7,7 +7,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
-    private const val BASE_URL = "http://192.168.168.240:5000/api/" // local machine IP address
+    private const val BASE_URL = "http://192.168.1.188:5000/api/" // local machine IP address
 
     private lateinit var preferencesManager: PreferencesManager
 
