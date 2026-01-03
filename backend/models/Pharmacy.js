@@ -24,27 +24,40 @@ const pharmacyStockSchema = new mongoose.Schema({
 });
 
 const pharmacySchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, 'Pharmacy name is required'],
-    trim: true,
-    maxlength: [100, 'Pharmacy name cannot be more than 100 characters']
-  },
-  address: {
-    type: String,
-    required: [true, 'Address is required'],
-    trim: true
-  },
-  phone: {
-    type: String,
-    required: [true, 'Phone number is required'],
-    trim: true
-  },
-  email: {
-    type: String,
-    trim: true,
-    lowercase: true
-  },
+   name: {
+     type: String,
+     required: [true, 'Pharmacy name is required'],
+     trim: true,
+     maxlength: [100, 'Pharmacy name cannot be more than 100 characters']
+   },
+   address: {
+     type: String,
+     required: [true, 'Address is required'],
+     trim: true
+   },
+   phone: {
+     type: String,
+     required: [true, 'Phone number is required'],
+     trim: true
+   },
+   email: {
+     type: String,
+     required: [true, 'Email is required'],
+     unique: true,
+     lowercase: true,
+     validate: {
+       validator: function(email) {
+         return /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(email);
+       },
+       message: 'Please enter a valid email'
+     }
+   },
+   password: {
+     type: String,
+     required: [true, 'Password is required'],
+     minlength: [6, 'Password must be at least 6 characters'],
+     select: false // Don't include password in queries by default
+   },
   latitude: {
     type: Number,
     required: [true, 'Latitude is required']
@@ -96,6 +109,35 @@ const pharmacySchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Index for better query performance
+pharmacySchema.index({ email: 1 });
+
+// Hash password before saving
+pharmacySchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+
+  try {
+    const bcrypt = require('bcryptjs');
+    const salt = await bcrypt.genSalt(12);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Compare password method
+pharmacySchema.methods.comparePassword = async function(candidatePassword) {
+  return await require('bcryptjs').compare(candidatePassword, this.password);
+};
+
+// Remove password from JSON output
+pharmacySchema.methods.toJSON = function() {
+  const pharmacyObject = this.toObject();
+  delete pharmacyObject.password;
+  return pharmacyObject;
+};
 
 // Indexes for better query performance
 pharmacySchema.index({ location: '2dsphere' });

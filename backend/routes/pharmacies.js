@@ -256,7 +256,6 @@ router.post('/', [
 // @access  Private (Admin/Pharmacy owner)
 router.put('/:id/stock', [
   protect,
-  authorize('admin'), // For now, only admin can update stock
   body('medicine').isMongoId().withMessage('Valid medicine ID required'),
   body('stock').isInt({ min: 0 }).withMessage('Stock must be non-negative'),
   body('price').optional().isFloat({ min: 0 }).withMessage('Price must be non-negative')
@@ -279,6 +278,17 @@ router.put('/:id/stock', [
       return res.status(404).json({
         success: false,
         message: 'Pharmacy not found'
+      });
+    }
+
+    // Check if user is admin or pharmacy owner
+    const isAdmin = req.user.role === 'admin';
+    const isPharmacyOwner = req.user.type === 'pharmacy' && req.user._id.toString() === pharmacy._id.toString();
+
+    if (!isAdmin && !isPharmacyOwner) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this pharmacy stock'
       });
     }
 

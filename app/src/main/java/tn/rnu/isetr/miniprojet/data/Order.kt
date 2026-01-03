@@ -26,7 +26,7 @@ data class OrderResponse(
 
 data class Order(
     val _id: String,
-    val customer: String,
+    val customer: String?, // Customer ID or name depending on population
     val pharmacy: Pharmacy,
     val items: List<OrderItemDetail>,
     val totalAmount: Double,

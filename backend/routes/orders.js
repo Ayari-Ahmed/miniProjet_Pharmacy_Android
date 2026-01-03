@@ -148,7 +148,8 @@ router.get('/', [
       .populate('items.medicine', 'name genericName')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
-      .skip(skip);
+      .skip(skip)
+      .lean(); // Return plain objects instead of Mongoose documents
 
     const total = await Order.countDocuments(query);
 
@@ -483,6 +484,147 @@ router.put('/:id/update-status', [
     });
   } catch (error) {
     console.error('Update order status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   GET /api/orders/pharmacy/my-orders
+// @desc    Get orders for pharmacy owner
+// @access  Private (Pharmacy owner only)
+router.get('/pharmacy/my-orders', [
+  protect,
+  query('status').optional().isIn(['pending', 'confirmed', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']),
+  query('limit').optional().isInt({ min: 1, max: 50 }),
+  query('page').optional().isInt({ min: 1 })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    // Check if it's a pharmacy token
+    if (req.user.type !== 'pharmacy') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized'
+      });
+    }
+
+    const { status, limit = 20, page = 1 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    let query = { pharmacy: req.user._id };
+
+    if (status) {
+      query.status = status;
+    }
+
+    const orders = await Order.find(query)
+      .populate('pharmacy', 'name address phone')
+      .populate('driver', 'name phone')
+      .populate('items.medicine', 'name genericName')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
+
+    const total = await Order.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: orders,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Get pharmacy orders error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   PUT /api/orders/:id/pharmacy-status
+// @desc    Update order status by pharmacy
+// @access  Private (Pharmacy owner only)
+router.put('/:id/pharmacy-status', [
+  protect,
+  body('status').isIn(['confirmed', 'processing', 'ready']).withMessage('Invalid status for pharmacy update'),
+  body('note').optional().trim()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    // Check if it's a pharmacy token
+    if (req.user.type !== 'pharmacy') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized'
+      });
+    }
+
+    const { status, note } = req.body;
+
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Check if pharmacy owns this order
+    if (order.pharmacy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this order'
+      });
+    }
+
+    // Check if status transition is valid for pharmacy
+    const validStatuses = ['confirmed', 'processing', 'ready'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status update for pharmacy'
+      });
+    }
+
+    order.updateStatus(status, note || `Status updated by pharmacy`);
+    await order.save();
+
+    await order.populate([
+      { path: 'customer', select: 'name phone' },
+      { path: 'pharmacy', select: 'name address phone' }
+    ]);
+
+    res.json({
+      success: true,
+      message: 'Order status updated successfully',
+      data: order
+    });
+  } catch (error) {
+    console.error('Update pharmacy order status error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

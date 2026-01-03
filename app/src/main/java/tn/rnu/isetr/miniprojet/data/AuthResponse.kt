@@ -9,5 +9,6 @@ data class AuthResponse(
 
 data class AuthData(
     val user: User?,
+    val pharmacy: Pharmacy?,
     val token: String?
 )

@@ -32,6 +32,22 @@ class PreferencesManager(context: Context) {
         } else null
     }
 
+    fun savePharmacy(pharmacy: Pharmacy) {
+        val pharmacyJson = gson.toJson(pharmacy)
+        prefs.edit().putString("pharmacy_data", pharmacyJson).apply()
+    }
+
+    fun getPharmacy(): Pharmacy? {
+        val pharmacyJson = prefs.getString("pharmacy_data", null)
+        return if (pharmacyJson != null) {
+            try {
+                gson.fromJson(pharmacyJson, Pharmacy::class.java)
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+    }
+
     fun clearToken() {
         prefs.edit().remove("auth_token").apply()
     }
@@ -40,9 +56,14 @@ class PreferencesManager(context: Context) {
         prefs.edit().remove("user_data").apply()
     }
 
+    fun clearPharmacy() {
+        prefs.edit().remove("pharmacy_data").apply()
+    }
+
     fun logout() {
         clearToken()
         clearUser()
+        clearPharmacy()
     }
 
     fun isLoggedIn(): Boolean {

@@ -12,6 +12,9 @@ class PharmacyViewModel : ViewModel() {
     private val _pharmacyState = MutableStateFlow<PharmacyState>(PharmacyState.Idle)
     val pharmacyState: StateFlow<PharmacyState> = _pharmacyState
 
+    private val _stockState = MutableStateFlow<StockState>(StockState.Idle)
+    val stockState: StateFlow<StockState> = _stockState
+
     fun getPharmacies() {
         _pharmacyState.value = PharmacyState.Loading
         viewModelScope.launch {
@@ -33,8 +36,34 @@ class PharmacyViewModel : ViewModel() {
         }
     }
 
+    fun updateStock(pharmacyId: String, medicineId: String, stock: Int, price: Double? = null) {
+        _stockState.value = StockState.Loading
+        viewModelScope.launch {
+            try {
+                val request = UpdateStockRequest(medicineId, stock, price)
+                val response = RetrofitClient.apiService.updatePharmacyStock(pharmacyId, request)
+                if (response.isSuccessful) {
+                    val stockResponse = response.body()
+                    if (stockResponse?.success == true) {
+                        _stockState.value = StockState.Success(stockResponse.data ?: emptyList())
+                    } else {
+                        _stockState.value = StockState.Error(stockResponse?.message ?: "Failed to update stock")
+                    }
+                } else {
+                    _stockState.value = StockState.Error("Failed to update stock: ${response.message()}")
+                }
+            } catch (e: Exception) {
+                _stockState.value = StockState.Error("Network error: ${e.localizedMessage}")
+            }
+        }
+    }
+
     fun resetState() {
         _pharmacyState.value = PharmacyState.Idle
+    }
+
+    fun resetStockState() {
+        _stockState.value = StockState.Idle
     }
 }
 
@@ -43,4 +72,11 @@ sealed class PharmacyState {
     object Loading : PharmacyState()
     data class Success(val pharmacies: List<Pharmacy>) : PharmacyState()
     data class Error(val message: String) : PharmacyState()
+}
+
+sealed class StockState {
+    object Idle : StockState()
+    object Loading : StockState()
+    data class Success(val stock: List<PharmacyStock>) : StockState()
+    data class Error(val message: String) : StockState()
 }

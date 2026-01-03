@@ -5,6 +5,7 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface ApiService {
@@ -23,11 +24,43 @@ interface ApiService {
     @POST("auth/change-password")
     suspend fun changePassword(@Body request: ChangePasswordRequest): Response<AuthResponse>
 
+    // Pharmacy Auth
+    @POST("pharmacies/auth/login")
+    suspend fun pharmacyLogin(@Body request: LoginRequest): Response<AuthResponse>
+
+    @POST("pharmacies/auth/register")
+    suspend fun pharmacyRegister(@Body request: RegisterRequest): Response<AuthResponse>
+
+    @GET("pharmacies/auth/me")
+    suspend fun getPharmacyProfile(): Response<AuthResponse>
+
+    @PUT("pharmacies/auth/update-profile")
+    suspend fun updatePharmacyProfile(@Body request: UpdateProfileRequest): Response<AuthResponse>
+
     @GET("pharmacies")
     suspend fun getPharmacies(
         @Query("limit") limit: Int = 20,
         @Query("page") page: Int = 1
     ): Response<PharmacyResponse>
+
+    @PUT("pharmacies/{id}/stock")
+    suspend fun updatePharmacyStock(
+        @Path("id") pharmacyId: String,
+        @Body request: UpdateStockRequest
+    ): Response<StockResponse>
+
+    @GET("orders/pharmacy/my-orders")
+    suspend fun getPharmacyOrders(
+        @Query("status") status: String? = null,
+        @Query("limit") limit: Int = 20,
+        @Query("page") page: Int = 1
+    ): Response<OrderListResponse>
+
+    @PUT("orders/{id}/pharmacy-status")
+    suspend fun updateOrderStatus(
+        @Path("id") orderId: String,
+        @Body request: UpdateOrderStatusRequest
+    ): Response<OrderResponse>
 
     @POST("orders")
     suspend fun createOrder(@Body request: OrderRequest): Response<OrderResponse>

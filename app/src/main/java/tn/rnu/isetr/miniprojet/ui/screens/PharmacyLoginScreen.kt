@@ -21,16 +21,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import tn.rnu.isetr.miniprojet.data.PreferencesManager
 import tn.rnu.isetr.miniprojet.viewmodel.AuthState
-import tn.rnu.isetr.miniprojet.viewmodel.AuthViewModel
+import tn.rnu.isetr.miniprojet.viewmodel.PharmacyAuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(
+fun PharmacyLoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
-    onNavigateToPharmacyLogin: () -> Unit,
     preferencesManager: PreferencesManager,
-    viewModel: AuthViewModel = viewModel()
+    viewModel: PharmacyAuthViewModel = viewModel()
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -43,7 +42,7 @@ fun LoginScreen(
             is AuthState.Success -> {
                 val authData = (authState as AuthState.Success).data
                 authData.token?.let { preferencesManager.saveToken(it) }
-                authData.user?.let { preferencesManager.saveUser(it) }
+                authData.pharmacy?.let { preferencesManager.savePharmacy(it) }
                 onLoginSuccess()
             }
             is AuthState.Error -> {
@@ -104,7 +103,7 @@ fun LoginScreen(
             )
 
             Text(
-                text = "Healthcare at your fingertips",
+                text = "Pharmacy Management",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color(0xFF64748B),
                 fontWeight = FontWeight.Medium
@@ -138,7 +137,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
-                        placeholder = { Text("you@example.com", color = Color(0xFF94A3B8)) },
+                        placeholder = { Text("pharmacy@example.com", color = Color(0xFF94A3B8)) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF10B981),
@@ -191,7 +190,7 @@ fun LoginScreen(
                     Button(
                         onClick = {
                             showError = null
-                            viewModel.login(email, password)
+                            viewModel.pharmacyLogin(email, password)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = authState !is AuthState.Loading,
@@ -229,14 +228,6 @@ fun LoginScreen(
                     "Don't have an account? Register",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF64748B)
-                )
-            }
-            TextButton(onClick = onNavigateToPharmacyLogin) {
-                Text(
-                    "Login as Pharmacy",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF10B981),
-                    fontWeight = FontWeight.Bold
                 )
             }
         }

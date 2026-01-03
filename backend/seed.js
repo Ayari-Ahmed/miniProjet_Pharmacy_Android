@@ -86,6 +86,7 @@ const samplePharmacies = [
     address: 'Avenue Habib Bourguiba, Tunis Medina',
     phone: '+216 71 123 456',
     email: 'centrale.pharmacy@email.com',
+    password: 'pharmacy123',
     latitude: 36.7988,
     longitude: 10.1658,
     operatingHours: {
@@ -106,6 +107,7 @@ const samplePharmacies = [
     address: 'Byrsa Hill, Carthage',
     phone: '+216 71 234 567',
     email: 'carthage.pharmacy@email.com',
+    password: 'pharmacy123',
     latitude: 36.8525,
     longitude: 10.3247,
     operatingHours: {
@@ -126,6 +128,7 @@ const samplePharmacies = [
     address: 'Rue de la Mosquée, Sidi Bou Said',
     phone: '+216 71 345 678',
     email: 'sidi.pharmacy@email.com',
+    password: 'pharmacy123',
     latitude: 36.8708,
     longitude: 10.3417,
     operatingHours: {
@@ -222,6 +225,9 @@ async function seedDatabase() {
     console.log('Admin: admin@hopemeds.com / admin123');
     console.log('Customer: john@example.com / password123');
     console.log('Driver: ahmed.driver@example.com / driver123');
+    console.log('Pharmacies: centrale.pharmacy@email.com / pharmacy123');
+    console.log('           carthage.pharmacy@email.com / pharmacy123');
+    console.log('           sidi.pharmacy@email.com / pharmacy123');
 
   } catch (error) {
     console.error('Error seeding database:', error);

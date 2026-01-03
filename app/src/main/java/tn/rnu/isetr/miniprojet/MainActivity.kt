@@ -46,6 +46,10 @@ import tn.rnu.isetr.miniprojet.ui.screens.OrderDetailsScreen
 import tn.rnu.isetr.miniprojet.ui.screens.OrderScreen
 import tn.rnu.isetr.miniprojet.ui.screens.OrdersScreen
 import tn.rnu.isetr.miniprojet.ui.screens.PharmaciesScreen
+import tn.rnu.isetr.miniprojet.ui.screens.PharmacyDashboardScreen
+import tn.rnu.isetr.miniprojet.ui.screens.PharmacyLoginScreen
+import tn.rnu.isetr.miniprojet.ui.screens.PharmacyOrdersScreen
+import tn.rnu.isetr.miniprojet.ui.screens.PharmacyStockScreen
 import tn.rnu.isetr.miniprojet.ui.screens.ProfileScreen
 import tn.rnu.isetr.miniprojet.ui.screens.RegisterScreen
 import tn.rnu.isetr.miniprojet.ui.theme.MiniProjetTheme
@@ -68,20 +72,47 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MiniProjetApp(preferencesManager: PreferencesManager) {
     var isLoggedIn by rememberSaveable { mutableStateOf(preferencesManager.isLoggedIn()) }
-    var showLogin by rememberSaveable { mutableStateOf(!isLoggedIn) }
+    var isPharmacyLoggedIn by rememberSaveable { mutableStateOf(preferencesManager.getPharmacy() != null) }
+    var showLogin by rememberSaveable { mutableStateOf(!isLoggedIn && !isPharmacyLoggedIn) }
     var showRegister by rememberSaveable { mutableStateOf(false) }
+    var showPharmacyLogin by rememberSaveable { mutableStateOf(false) }
     var selectedPharmacy by rememberSaveable { mutableStateOf<Pharmacy?>(null) }
     var selectedOrder by rememberSaveable { mutableStateOf<Order?>(null) }
+    var currentPharmacyScreen by rememberSaveable { mutableStateOf<PharmacyScreen?>(null) }
 
     val onLogout = {
         preferencesManager.logout()
         isLoggedIn = false
+        isPharmacyLoggedIn = false
         showLogin = true
+        showRegister = false
+        showPharmacyLogin = false
         selectedPharmacy = null
         selectedOrder = null
+        currentPharmacyScreen = null
     }
 
-    if (showLogin || showRegister) {
+    // Handle order placement first (highest priority)
+    if (selectedPharmacy != null) {
+        val pharmacy = selectedPharmacy!!
+        OrderScreen(
+            pharmacy = pharmacy,
+            onOrderSuccess = {
+                selectedPharmacy = null
+            },
+            onBack = {
+                selectedPharmacy = null
+            }
+        )
+    } else if (selectedOrder != null) {
+        val order = selectedOrder!!
+        OrderDetailsScreen(
+            order = order,
+            onBack = {
+                selectedOrder = null
+            }
+        )
+    } else if (showLogin || showRegister || showPharmacyLogin) {
         when {
             showLogin -> LoginScreen(
                 onLoginSuccess = {
@@ -91,6 +122,10 @@ fun MiniProjetApp(preferencesManager: PreferencesManager) {
                 onNavigateToRegister = {
                     showLogin = false
                     showRegister = true
+                },
+                onNavigateToPharmacyLogin = {
+                    showLogin = false
+                    showPharmacyLogin = true
                 },
                 preferencesManager = preferencesManager
             )
@@ -105,27 +140,58 @@ fun MiniProjetApp(preferencesManager: PreferencesManager) {
                 },
                 preferencesManager = preferencesManager
             )
+            showPharmacyLogin -> PharmacyLoginScreen(
+                onLoginSuccess = {
+                    isPharmacyLoggedIn = true
+                    showPharmacyLogin = false
+                    currentPharmacyScreen = PharmacyScreen.DASHBOARD
+                },
+                onNavigateToRegister = {
+                    // For now, navigate back to login selection
+                    showPharmacyLogin = false
+                    showLogin = true
+                },
+                preferencesManager = preferencesManager
+            )
         }
-    } else if (selectedOrder != null) {
-        val order = selectedOrder!!
-        OrderDetailsScreen(
-            order = order,
-            onBack = {
-                selectedOrder = null
+    } else if (isPharmacyLoggedIn) {
+        val pharmacy = preferencesManager.getPharmacy()
+        if (pharmacy != null) {
+            when (currentPharmacyScreen) {
+                PharmacyScreen.DASHBOARD -> PharmacyDashboardScreen(
+                    pharmacy = pharmacy,
+                    preferencesManager = preferencesManager,
+                    onNavigateToStock = { currentPharmacyScreen = PharmacyScreen.STOCK },
+                    onNavigateToOrders = { currentPharmacyScreen = PharmacyScreen.ORDERS },
+                    onLogout = onLogout
+                )
+                PharmacyScreen.STOCK -> PharmacyStockScreen(
+                    pharmacy = pharmacy,
+                    preferencesManager = preferencesManager,
+                    onNavigateBack = { currentPharmacyScreen = PharmacyScreen.DASHBOARD }
+                )
+                PharmacyScreen.ORDERS -> PharmacyOrdersScreen(
+                    pharmacy = pharmacy,
+                    preferencesManager = preferencesManager,
+                    onNavigateBack = { currentPharmacyScreen = PharmacyScreen.DASHBOARD }
+                )
+                null -> {
+                    // Default to dashboard if no screen is set
+                    currentPharmacyScreen = PharmacyScreen.DASHBOARD
+                    PharmacyDashboardScreen(
+                        pharmacy = pharmacy,
+                        preferencesManager = preferencesManager,
+                        onNavigateToStock = { currentPharmacyScreen = PharmacyScreen.STOCK },
+                        onNavigateToOrders = { currentPharmacyScreen = PharmacyScreen.ORDERS },
+                        onLogout = onLogout
+                    )
+                }
             }
-        )
-    } else if (selectedPharmacy != null) {
-        val pharmacy = selectedPharmacy!!
-        OrderScreen(
-            pharmacy = pharmacy,
-            onOrderSuccess = {
-                selectedPharmacy = null
-            },
-            onBack = {
-                selectedPharmacy = null
-            }
-        )
-    } else {
+        } else {
+            // Pharmacy data is corrupted, logout
+            onLogout()
+        }
+    } else if (isLoggedIn) {
         MainApp(
             onOrderClick = { pharmacy ->
                 selectedPharmacy = pharmacy
@@ -208,6 +274,12 @@ enum class AppDestinations(
     MAP("Map", Icons.Default.LocationOn),
     ORDERS("Orders", Icons.Default.AccountBox),
     PROFILE("Profile", Icons.Default.AccountBox),
+}
+
+enum class PharmacyScreen {
+    DASHBOARD,
+    STOCK,
+    ORDERS
 }
 
 @Composable

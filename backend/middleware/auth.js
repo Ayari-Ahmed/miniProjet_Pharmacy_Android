@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Pharmacy = require('../models/Pharmacy');
 
 // Protect routes - require authentication
 const protect = async (req, res, next) => {
@@ -22,24 +23,41 @@ const protect = async (req, res, next) => {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
-      // Get user from token
-      const user = await User.findById(decoded.id).select('-password');
-
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: 'No user found with this token'
-        });
+      let entity;
+      if (decoded.type === 'pharmacy') {
+        // Get pharmacy from token
+        entity = await Pharmacy.findById(decoded.id).select('-password');
+        if (!entity) {
+          return res.status(401).json({
+            success: false,
+            message: 'No pharmacy found with this token'
+          });
+        }
+        if (!entity.isActive) {
+          return res.status(401).json({
+            success: false,
+            message: 'Pharmacy account is deactivated'
+          });
+        }
+        req.user = { ...entity.toObject(), type: 'pharmacy' };
+      } else {
+        // Get user from token (default behavior)
+        entity = await User.findById(decoded.id).select('-password');
+        if (!entity) {
+          return res.status(401).json({
+            success: false,
+            message: 'No user found with this token'
+          });
+        }
+        if (!entity.isActive) {
+          return res.status(401).json({
+            success: false,
+            message: 'User account is deactivated'
+          });
+        }
+        req.user = entity;
       }
 
-      if (!user.isActive) {
-        return res.status(401).json({
-          success: false,
-          message: 'User account is deactivated'
-        });
-      }
-
-      req.user = user;
       next();
     } catch (error) {
       return res.status(401).json({

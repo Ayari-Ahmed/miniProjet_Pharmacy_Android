@@ -70,6 +70,50 @@ class OrderViewModel : ViewModel() {
         }
     }
 
+    fun getPharmacyOrders(status: String? = null) {
+        _orderState.value = OrderState.Loading
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.apiService.getPharmacyOrders(status)
+                if (response.isSuccessful) {
+                    val orderListResponse = response.body()
+                    if (orderListResponse?.success == true) {
+                        _orderState.value = OrderState.OrdersLoaded(orderListResponse.data)
+                    } else {
+                        _orderState.value = OrderState.Error(orderListResponse?.message ?: "Failed to load orders")
+                    }
+                } else {
+                    _orderState.value = OrderState.Error("Failed to load orders: ${response.message()}")
+                }
+            } catch (e: Exception) {
+                _orderState.value = OrderState.Error("Network error: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun updateOrderStatus(orderId: String, status: String) {
+        _orderState.value = OrderState.Loading
+        viewModelScope.launch {
+            try {
+                val request = UpdateOrderStatusRequest(status)
+                val response = RetrofitClient.apiService.updateOrderStatus(orderId, request)
+                if (response.isSuccessful) {
+                    val orderResponse = response.body()
+                    if (orderResponse?.success == true) {
+                        // After successful update, refresh the pharmacy orders list
+                        getPharmacyOrders()
+                    } else {
+                        _orderState.value = OrderState.Error(orderResponse?.message ?: "Failed to update order status")
+                    }
+                } else {
+                    _orderState.value = OrderState.Error("Failed to update order status: ${response.message()}")
+                }
+            } catch (e: Exception) {
+                _orderState.value = OrderState.Error("Network error: ${e.localizedMessage}")
+            }
+        }
+    }
+
     fun resetState() {
         _orderState.value = OrderState.Idle
     }
