@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import tn.rnu.isetr.miniprojet.data.*
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(private val authRepository: AuthRepository = AuthRepositoryImpl()) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState
