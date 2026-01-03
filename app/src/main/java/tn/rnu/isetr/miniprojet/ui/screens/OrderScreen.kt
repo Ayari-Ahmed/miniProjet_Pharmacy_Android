@@ -43,8 +43,15 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.core.content.FileProvider
 import java.io.File
 import android.net.Uri
+import androidx.compose.runtime.LaunchedEffect
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
+import android.Manifest
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun OrderScreen(
     pharmacy: Pharmacy,
@@ -59,17 +66,34 @@ fun OrderScreen(
     var showMapPicker by remember { mutableStateOf(false) }
     var selectedLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var prescriptionUri by remember { mutableStateOf<Uri?>(null) }
+    var currentPhotoFile by remember { mutableStateOf<File?>(null) }
     var showPrescriptionDialog by remember { mutableStateOf(false) }
 
     val orderState by viewModel.orderState.collectAsState()
     val context = LocalContext.current
+
+    // Camera permission
+    val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
 
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture(),
         onResult = { success ->
             if (success) {
-                // prescriptionUri is already set
+                // Check if the file was actually created and has content
+                currentPhotoFile?.let { file ->
+                    if (file.exists() && file.length() > 0) {
+                        // prescriptionUri is already set
+                    } else {
+                        prescriptionUri = null
+                        currentPhotoFile = null
+                    }
+                } ?: run {
+                    prescriptionUri = null
+                }
+            } else {
+                prescriptionUri = null
+                currentPhotoFile = null
             }
         }
     )
@@ -431,15 +455,27 @@ fun OrderScreen(
                                         ) {
                                             OutlinedButton(
                                                 onClick = {
-                                                    val photoFile = File(context.cacheDir, "prescription_${System.currentTimeMillis()}.jpg")
-                                                    val photoUri = FileProvider.getUriForFile(
-                                                        context,
-                                                        "${context.packageName}.fileprovider",
-                                                        photoFile
-                                                    )
-                                                    prescriptionUri = photoUri
-                                                    cameraLauncher.launch(photoUri)
-                                                    showPrescriptionDialog = false
+                                                    if (cameraPermissionState.status.isGranted) {
+                                                        try {
+                                                            val photoFile = File(context.cacheDir, "prescription_${System.currentTimeMillis()}.jpg")
+                                                            photoFile.createNewFile()
+                                                            val photoUri = FileProvider.getUriForFile(
+                                                                context,
+                                                                "${context.packageName}.fileprovider",
+                                                                photoFile
+                                                            )
+                                                            prescriptionUri = photoUri
+                                                            currentPhotoFile = photoFile
+                                                            cameraLauncher.launch(photoUri)
+                                                            showPrescriptionDialog = false
+                                                        } catch (e: Exception) {
+                                                            // Handle error - could show a toast or log
+                                                            prescriptionUri = null
+                                                            currentPhotoFile = null
+                                                        }
+                                                    } else {
+                                                        cameraPermissionState.launchPermissionRequest()
+                                                    }
                                                 },
                                                 modifier = Modifier.weight(1f),
                                                 shape = RoundedCornerShape(12.dp),

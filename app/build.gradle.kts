@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.retrofit.gson.converter)
     implementation(libs.osmdroid)
     implementation(libs.coil)
+    implementation(libs.accompanist.permissions)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
