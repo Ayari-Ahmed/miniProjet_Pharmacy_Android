@@ -485,7 +485,7 @@ router.put('/:id/assign-driver', protect, authorize('driver'), async (req, res) 
 // @access  Private
 router.put('/:id/update-status', [
   protect,
-  body('status').isIn(['confirmed', 'processing', 'ready', 'delivering', 'delivered']).withMessage('Invalid status'),
+  body('status').isIn(['pending','confirmed', 'processing', 'ready', 'delivering', 'delivered']).withMessage('Invalid status'),
   body('note').optional().trim()
 ], async (req, res) => {
   try {
@@ -619,7 +619,7 @@ router.get('/pharmacy/my-orders', [
 // @access  Private (Pharmacy owner only)
 router.put('/:id/pharmacy-status', [
   protect,
-  body('status').isIn(['confirmed', 'processing', 'ready']).withMessage('Invalid status for pharmacy update'),
+  body('status').isIn(['pending','confirmed', 'processing', 'ready', 'delivering', 'delivered', 'cancelled']).withMessage('Invalid status for pharmacy update'),
   body('note').optional().trim()
 ], async (req, res) => {
   try {
@@ -660,7 +660,7 @@ router.put('/:id/pharmacy-status', [
     }
 
     // Check if status transition is valid for pharmacy
-    const validStatuses = ['confirmed', 'processing', 'ready'];
+    const validStatuses = ['pending','confirmed', 'processing', 'ready', 'delivering', 'delivered', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -670,6 +670,18 @@ router.put('/:id/pharmacy-status', [
 
     order.updateStatus(status, note || `Status updated by pharmacy`);
     await order.save();
+
+    // If order is delivered, update pharmacy stock
+    if (status === 'delivered') {
+      const pharmacy = await Pharmacy.findById(order.pharmacy);
+      if (pharmacy) {
+        order.items.forEach(item => {
+          const currentStock = pharmacy.getMedicineStock(item.medicine);
+          pharmacy.updateStock(item.medicine, Math.max(0, currentStock - item.quantity));
+        });
+        await pharmacy.save();
+      }
+    }
 
     await order.populate([
       { path: 'customer', select: 'name phone' },

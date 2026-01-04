@@ -2,6 +2,7 @@ package tn.rnu.isetr.miniprojet.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -47,6 +48,7 @@ fun PharmacyStockScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var editingStockItem by remember { mutableStateOf<PharmacyStock?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var selectedFilter by remember { mutableStateOf("all") }
 
     val stockState by viewModel.stockState.collectAsState()
     val medicines by viewModel.medicines.collectAsState()
@@ -89,122 +91,172 @@ fun PharmacyStockScreen(
         }
     }
 
+    // Filter stock items
+    val filteredStock = when (selectedFilter) {
+        "low" -> pharmacy.stock.filter { it.stock > 0 && it.stock <= 10 }
+        "out" -> pharmacy.stock.filter { it.stock == 0 }
+        else -> pharmacy.stock
+    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Stock Management",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1E293B)
-                        )
-                        Text(
-                            text = "${pharmacy.stock.size} medicines in stock",
-                            fontSize = 14.sp,
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        // Compact Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color(0xFF64748B)
+                    )
+                }
+                Text(
+                    text = "Stock Management",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF0F172A),
+                    letterSpacing = (-0.5).sp
+                )
+                Box(
+                    modifier = Modifier
+                        .background(Color(0xFF10B981), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = pharmacy.stock.size.toString(),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(
+                    onClick = { refreshPharmacyData() },
+                    enabled = !isRefreshing,
+                    modifier = Modifier
+                        .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
                             color = Color(0xFF64748B),
-                            fontWeight = FontWeight.Medium
+                            strokeWidth = 2.dp
                         )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    } else {
                         Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            Icons.Default.Refresh,
+                            contentDescription = "Refresh",
                             tint = Color(0xFF64748B)
                         )
                     }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { refreshPharmacyData() },
-                        enabled = !isRefreshing
-                    ) {
-                        if (isRefreshing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = Color(0xFF64748B),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = "Refresh",
-                                tint = Color(0xFF64748B)
-                            )
-                        }
-                    }
-                    FilledTonalButton(
-                        onClick = { showAddDialog = true },
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = Color(0xFF10B981)
-                        )
-                    ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Add Medicine",
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add Medicine")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = Color(0xFF1E293B)
-                )
-            )
-        },
-        containerColor = Color(0xFFF8FAFC)
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
-        ) {
-            if (pharmacy.stock.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 64.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.ShoppingCart,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = Color(0xFFCBD5E1)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "No medicines in stock",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF64748B)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Add your first medicine to get started",
-                            fontSize = 14.sp,
-                            color = Color(0xFF94A3B8),
-                            textAlign = TextAlign.Center
-                        )
-                    }
                 }
-            } else {
-                items(pharmacy.stock.sortedBy { it.medicine.name }) { stockItem ->
-                    StockItemCard(
+                FilledTonalButton(
+                    onClick = { showAddDialog = true },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = Color(0xFF10B981)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Add Medicine",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Add", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Filter Chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = selectedFilter == "all",
+                onClick = { selectedFilter = "all" },
+                label = { Text("All", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFF10B981),
+                    selectedLabelColor = Color.White
+                ),
+                shape = RoundedCornerShape(10.dp)
+            )
+            FilterChip(
+                selected = selectedFilter == "low",
+                onClick = { selectedFilter = "low" },
+                label = { Text("Low Stock", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFF59E0B),
+                    selectedLabelColor = Color.White
+                ),
+                shape = RoundedCornerShape(10.dp)
+            )
+            FilterChip(
+                selected = selectedFilter == "out",
+                onClick = { selectedFilter = "out" },
+                label = { Text("Out of Stock", fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFEF4444),
+                    selectedLabelColor = Color.White
+                ),
+                shape = RoundedCornerShape(10.dp)
+            )
+        }
+
+        // Stock List
+        if (pharmacy.stock.isEmpty()) {
+            PharmacyEmptyState(
+                icon = Icons.Default.ShoppingCart,
+                title = "No medicines in stock",
+                subtitle = "Add your first medicine to get started"
+            )
+        } else if (filteredStock.isEmpty()) {
+            PharmacyEmptyState(
+                icon = Icons.Default.Search,
+                title = "No items found",
+                subtitle = "Try changing the filter to see more items"
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(filteredStock.sortedBy { it.medicine.name }) { stockItem ->
+                    EnhancedStockItemCard(
                         stockItem = stockItem,
                         onEdit = { editingStockItem = stockItem },
                         onDelete = {
                             viewModel.updateStock(pharmacy._id, stockItem.medicine._id, 0)
+                        },
+                        onStatusUpdate = { newStatus ->
+                            val newQuantity = when (newStatus) {
+                                "in_stock" -> 50
+                                "low_stock" -> 5
+                                "out_of_stock" -> 0
+                                else -> stockItem.stock
+                            }
+                            viewModel.updateStock(pharmacy._id, stockItem.medicine._id, newQuantity, stockItem.price)
                         },
                         stockState = stockState
                     )
@@ -240,17 +292,47 @@ fun PharmacyStockScreen(
 }
 
 @Composable
-private fun StockItemCard(
+private fun EnhancedStockItemCard(
     stockItem: PharmacyStock,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onStatusUpdate: (String) -> Unit,
     stockState: StockState
 ) {
+    var showDialog by remember { mutableStateOf(false) }
+
+    val stockStatus = when {
+        stockItem.stock == 0 -> "out_of_stock"
+        stockItem.stock <= 10 -> "low_stock"
+        else -> "in_stock"
+    }
+
+    val statusColor = when (stockStatus) {
+        "in_stock" -> Color(0xFF10B981)
+        "low_stock" -> Color(0xFFF59E0B)
+        "out_of_stock" -> Color(0xFFEF4444)
+        else -> Color(0xFF6B7280)
+    }
+
+    val statusGradient = when (stockStatus) {
+        "in_stock" -> Brush.linearGradient(colors = listOf(Color(0xFF10B981), Color(0xFF059669)))
+        "low_stock" -> Brush.linearGradient(colors = listOf(Color(0xFFF59E0B), Color(0xFFD97706)))
+        "out_of_stock" -> Brush.linearGradient(colors = listOf(Color(0xFFEF4444), Color(0xFFDC2626)))
+        else -> Brush.linearGradient(colors = listOf(Color(0xFF6B7280), Color(0xFF4B5563)))
+    }
+
+    val statusText = when (stockStatus) {
+        "in_stock" -> "In Stock"
+        "low_stock" -> "Low Stock"
+        "out_of_stock" -> "Out of Stock"
+        else -> "Unknown"
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9))
     ) {
         Row(
             modifier = Modifier
@@ -258,91 +340,102 @@ private fun StockItemCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Medicine Icon with gradient background
+            // Status Icon with gradient background
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
-                        )
-                    ),
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(statusGradient)
+                    .border(2.dp, statusColor.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "💊",
-                    fontSize = 20.sp
-                )
+                when (stockStatus) {
+                    "in_stock" -> Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    "low_stock" -> Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    "out_of_stock" -> Icon(
+                        Icons.Default.Close,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    else -> Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             // Medicine Details
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stockItem.medicine.name,
-                    fontSize = 18.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1E293B),
-                    letterSpacing = 0.3.sp
+                    color = Color(0xFF0F172A),
+                    letterSpacing = 0.2.sp
                 )
 
                 stockItem.medicine.genericName?.let {
                     Text(
                         text = it,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         color = Color(0xFF64748B),
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Stock Status and Price
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 6.dp, bottom = 4.dp)
                 ) {
-                    // Stock Badge
-                    Surface(
-                        color = when {
-                            stockItem.stock == 0 -> Color(0xFFFEE2E2)
-                            stockItem.stock < 10 -> Color(0xFFFEF3C7)
-                            else -> Color(0xFFDCFCE7)
-                        },
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier.padding(vertical = 4.dp)
+                    Box(
+                        modifier = Modifier
+                            .background(statusColor.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "${stockItem.stock} in stock",
-                            fontSize = 12.sp,
+                            text = statusText,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = when {
-                                stockItem.stock == 0 -> Color(0xFFDC2626)
-                                stockItem.stock < 10 -> Color(0xFFD97706)
-                                else -> Color(0xFF166534)
-                            },
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            color = statusColor
                         )
                     }
-
-                    // Price
-                    Surface(
-                        color = Color(0xFFE6F7F0),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.padding(vertical = 4.dp)
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFF1F5F9), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "${String.format("%.2f", stockItem.price)} DT",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF059669),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            text = "${stockItem.stock} units",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF475569)
                         )
                     }
                 }
+
+                Text(
+                    text = "${String.format("%.2f", stockItem.price)} DT",
+                    fontSize = 16.sp,
+                    color = Color(0xFF10B981),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
 
             // Action Buttons
@@ -350,6 +443,24 @@ private fun StockItemCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.width(48.dp)
             ) {
+                // Status Update Button
+                Button(
+                    onClick = { showDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .width(48.dp)
+                        .height(36.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1E40AF))
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Update Status",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
                 // Edit Button
                 FilledTonalIconButton(
                     onClick = onEdit,
@@ -383,6 +494,92 @@ private fun StockItemCard(
                 }
             }
         }
+    }
+
+    // Status Update Dialog
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = Color(0xFF3B82F6),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Update Stock Status",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Medicine: ${stockItem.medicine.name}",
+                        fontSize = 14.sp,
+                        color = Color(0xFF64748B),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    val statuses = listOf(
+                        "in_stock" to "In Stock (50 units)",
+                        "low_stock" to "Low Stock (5 units)",
+                        "out_of_stock" to "Out of Stock (0 units)"
+                    )
+
+                    statuses.forEach { (status, description) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onStatusUpdate(status)
+                                    showDialog = false
+                                }
+                                .padding(vertical = 8.dp)
+                        ) {
+                            RadioButton(
+                                selected = stockStatus == status,
+                                onClick = {
+                                    onStatusUpdate(status)
+                                    showDialog = false
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = when (status) {
+                                        "in_stock" -> Color(0xFF10B981)
+                                        "low_stock" -> Color(0xFFF59E0B)
+                                        "out_of_stock" -> Color(0xFFEF4444)
+                                        else -> Color(0xFF6B7280)
+                                    }
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = description.split(" (")[0],
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = description.split(" (").getOrNull(1)?.removeSuffix(")") ?: "",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF64748B)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("Cancel", color = Color(0xFF6B7280))
+                }
+            }
+        )
     }
 }
 
