@@ -50,6 +50,7 @@ import android.Manifest
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import android.content.Intent
 import android.provider.MediaStore
 import android.app.Activity
@@ -67,6 +68,12 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import tn.rnu.isetr.miniprojet.data.RetrofitClient
+import android.location.Geocoder
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import tn.rnu.isetr.miniprojet.utils.getCurrentLocation
+import tn.rnu.isetr.miniprojet.utils.reverseGeocode
 
 val PharmacySaver = Saver<Pharmacy, String>(
     save = { it._id },
@@ -81,12 +88,16 @@ fun OrderScreen(
     onBack: () -> Unit,
     viewModel: OrderViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var deliveryAddress by remember { mutableStateOf("") }
     var specialInstructions by remember { mutableStateOf("") }
     var selectedItems by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var showSuccessDialog by remember { mutableStateOf(false) }
     var showMapPicker by remember { mutableStateOf(false) }
     var selectedLocation by remember { mutableStateOf<GeoPoint?>(null) }
+    var currentLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var prescriptionUri by remember { mutableStateOf<Uri?>(null) }
     // We no longer need `currentPhotoFile` as a state variable.
     // var currentPhotoFile by remember { mutableStateOf<File?>(null) }
@@ -94,7 +105,14 @@ fun OrderScreen(
     var showPrescriptionDialog by remember { mutableStateOf(false) }
 
     val orderState by viewModel.orderState.collectAsState()
-    val context = LocalContext.current
+    
+    // Location permissions
+    val locationPermissionsState = rememberMultiplePermissionsState(
+        permissions = listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+    )
     
     // Camera permission
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
@@ -389,16 +407,150 @@ fun OrderScreen(
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        OutlinedTextField(
-                            value = deliveryAddress,
-                            onValueChange = { deliveryAddress = it },
-                            label = { Text("Delivery Address") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            minLines = 2
+                        // Delivery Address Section with Map Picker
+                        Text(
+                            text = "Delivery Address",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF0F172A),
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        if (selectedLocation == null) {
+                            // Show map picker interface when no location selected
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                                border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFE2E8F0))
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(
+                                        Icons.Default.LocationOn,
+                                        contentDescription = "Select Location",
+                                        tint = Color(0xFF64748B),
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Tap to select delivery location",
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF64748B),
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedButton(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                // Request permissions if not granted
+                                                if (!locationPermissionsState.permissions.all { it.status.isGranted }) {
+                                                    locationPermissionsState.launchMultiplePermissionRequest()
+                                                }
+
+                                                // Try to get current location
+                                                if (locationPermissionsState.permissions.all { it.status.isGranted }) {
+                                                    currentLocation = getCurrentLocation(context)
+                                                }
+
+                                                showMapPicker = true
+                                            }
+                                        },
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = Color(0xFF10B981)
+                                        ),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981))
+                                    ) {
+                                        Text("Pick Location on Map")
+                                    }
+                                }
+                            }
+                        } else {
+                            // Show selected location with map and address
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+                            ) {
+                                AndroidView(
+                                    factory = { ctx ->
+                                        Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", 0))
+                                        MapView(ctx).apply {
+                                            setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+                                            setMultiTouchControls(true)
+                                            controller.setZoom(15.0)
+                                            controller.setCenter(selectedLocation)
+
+                                            // Add delivery location marker
+                                            val marker = Marker(this).apply {
+                                                position = selectedLocation!!
+                                                title = "Delivery Location"
+                                                snippet = deliveryAddress.takeIf { it.isNotBlank() } ?: "Selected Location"
+                                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                            }
+                                            overlays.add(marker)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Show selected address and option to change
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Selected Address:",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF64748B),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = deliveryAddress,
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF0F172A),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            // Request permissions if not granted
+                                            if (!locationPermissionsState.permissions.all { it.status.isGranted }) {
+                                                locationPermissionsState.launchMultiplePermissionRequest()
+                                            }
+
+                                            // Try to get current location
+                                            if (locationPermissionsState.permissions.all { it.status.isGranted }) {
+                                                currentLocation = getCurrentLocation(context)
+                                            }
+
+                                            showMapPicker = true
+                                        }
+                                    },
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = Color(0xFF10B981)
+                                    ),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981))
+                                ) {
+                                    Text("Change", fontSize = 12.sp)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         OutlinedTextField(
                             value = specialInstructions,
@@ -633,8 +785,19 @@ fun OrderScreen(
                 Button(
                     onClick = {
                         if (deliveryAddress.isBlank()) {
-                            // Open map picker if no address
-                            showMapPicker = true
+                            // Request permissions and get current location before opening map picker
+                            coroutineScope.launch {
+                                if (!locationPermissionsState.permissions.all { it.status.isGranted }) {
+                                    locationPermissionsState.launchMultiplePermissionRequest()
+                                }
+
+                                // Try to get current location
+                                if (locationPermissionsState.permissions.all { it.status.isGranted }) {
+                                    currentLocation = getCurrentLocation(context)
+                                }
+
+                                showMapPicker = true
+                            }
                         } else if (requiresPrescription && prescriptionUri == null) {
                             // Show prescription dialog if prescription is required but not uploaded
                             showPrescriptionDialog = true
@@ -763,9 +926,21 @@ fun OrderScreen(
                                 MapView(ctx).apply {
                                     setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
                                     setMultiTouchControls(true)
-                                    controller.setZoom(12.0)
-                                    val startPoint = selectedLocation ?: GeoPoint(36.8065, 10.1815) // Tunis
+                                    controller.setZoom(15.0)
+                                    val startPoint = selectedLocation ?: currentLocation ?: GeoPoint(36.8065, 10.1815) // Tunis
                                     controller.setCenter(startPoint)
+
+                                    // Add current location marker if available
+                                    currentLocation?.let { currentLoc ->
+                                        if (selectedLocation == null) {
+                                            val currentMarker = Marker(this).apply {
+                                                position = currentLoc
+                                                title = "Current Location"
+                                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                            }
+                                            overlays.add(currentMarker)
+                                        }
+                                    }
 
                                     // Add map events overlay for tap detection
                                     val mapEventsReceiver = object : MapEventsReceiver {
@@ -839,8 +1014,11 @@ fun OrderScreen(
                         }
                         Button(
                             onClick = {
-                                selectedLocation?.let {
-                                    deliveryAddress = "${it.latitude}, ${it.longitude}"
+                                selectedLocation?.let { location ->
+                                    coroutineScope.launch {
+                                        val addressText = reverseGeocode(context, location)
+                                        deliveryAddress = addressText
+                                    }
                                 }
                                 showMapPicker = false
                             },

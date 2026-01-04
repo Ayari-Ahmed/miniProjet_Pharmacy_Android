@@ -16,12 +16,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import org.osmdroid.config.Configuration
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
 import tn.rnu.isetr.miniprojet.data.Order
 import tn.rnu.isetr.miniprojet.viewmodel.OrderViewModel
 
@@ -303,6 +309,44 @@ fun OrderDetailsScreen(
                             color = Color(0xFF64748B),
                             lineHeight = 20.sp
                         )
+
+                        // Show map if coordinates are available
+                        if (order.deliveryLatitude != null && order.deliveryLongitude != null) {
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
+                            ) {
+                                AndroidView(
+                                    factory = { ctx ->
+                                        Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", 0))
+                                        MapView(ctx).apply {
+                                            setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+                                            setMultiTouchControls(true)
+                                            controller.setZoom(15.0)
+
+                                            val deliveryPoint = GeoPoint(order.deliveryLatitude!!, order.deliveryLongitude!!)
+                                            controller.setCenter(deliveryPoint)
+
+                                            // Add delivery location marker
+                                            val marker = Marker(this).apply {
+                                                position = deliveryPoint
+                                                title = "Delivery Location"
+                                                snippet = order.deliveryAddress
+                                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                            }
+                                            overlays.add(marker)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
                     }
                 }
             }

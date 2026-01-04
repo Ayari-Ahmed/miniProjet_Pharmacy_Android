@@ -30,8 +30,23 @@ import org.osmdroid.views.overlay.Marker
 import tn.rnu.isetr.miniprojet.data.PreferencesManager
 import tn.rnu.isetr.miniprojet.viewmodel.AuthState
 import tn.rnu.isetr.miniprojet.viewmodel.AuthViewModel
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.accompanist.permissions.isGranted
+import android.location.Geocoder
+import android.location.Location
+import android.location.LocationManager
+import androidx.core.content.ContextCompat
+import androidx.core.content.getSystemService
+import android.Manifest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import tn.rnu.isetr.miniprojet.utils.getCurrentLocation
+import tn.rnu.isetr.miniprojet.utils.reverseGeocode
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun RegisterScreen(
     onRegisterSuccess: () -> Unit,
@@ -39,6 +54,9 @@ fun RegisterScreen(
     preferencesManager: PreferencesManager,
     viewModel: AuthViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -47,6 +65,15 @@ fun RegisterScreen(
     var showError by remember { mutableStateOf<String?>(null) }
     var showMapPicker by remember { mutableStateOf(false) }
     var selectedLocation by remember { mutableStateOf<GeoPoint?>(null) }
+    var currentLocation by remember { mutableStateOf<GeoPoint?>(null) }
+
+    // Location permissions
+    val locationPermissionsState = rememberMultiplePermissionsState(
+        permissions = listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+    )
 
     val authState by viewModel.authState.collectAsState()
 
@@ -263,7 +290,19 @@ fun RegisterScreen(
 
                         OutlinedButton(
                             onClick = {
-                                showMapPicker = true
+                                coroutineScope.launch {
+                                    // Request permissions if not granted
+                                    if (!locationPermissionsState.permissions.all { it.status.isGranted }) {
+                                        locationPermissionsState.launchMultiplePermissionRequest()
+                                    }
+
+                                    // Try to get current location
+                                    if (locationPermissionsState.permissions.all { it.status.isGranted }) {
+                                        currentLocation = getCurrentLocation(context)
+                                    }
+
+                                    showMapPicker = true
+                                }
                             },
                             modifier = Modifier.width(120.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
@@ -343,9 +382,21 @@ fun RegisterScreen(
                             MapView(ctx).apply {
                                 setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
                                 setMultiTouchControls(true)
-                                controller.setZoom(10.0)
-                                val startPoint = selectedLocation ?: GeoPoint(36.8065, 10.1815) // Tunis
+                                controller.setZoom(15.0)
+                                val startPoint = selectedLocation ?: currentLocation ?: GeoPoint(36.8065, 10.1815) // Tunis
                                 controller.setCenter(startPoint)
+
+                                // Add current location marker if available
+                                currentLocation?.let { currentLoc ->
+                                    if (selectedLocation == null) {
+                                        val currentMarker = Marker(this).apply {
+                                            position = currentLoc
+                                            title = "Current Location"
+                                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                        }
+                                        overlays.add(currentMarker)
+                                    }
+                                }
 
                                 // Add map events overlay for tap detection
                                 val mapEventsReceiver = object : MapEventsReceiver {
@@ -407,8 +458,11 @@ fun RegisterScreen(
             },
             confirmButton = {
                 Button(onClick = {
-                    selectedLocation?.let {
-                        address = "${it.latitude}, ${it.longitude}"
+                    selectedLocation?.let { location ->
+                        coroutineScope.launch {
+                            val addressText = reverseGeocode(context, location)
+                            address = addressText
+                        }
                     }
                     showMapPicker = false
                 }) {
