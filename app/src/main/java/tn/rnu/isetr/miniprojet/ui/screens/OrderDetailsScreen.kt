@@ -36,7 +36,7 @@ fun OrderDetailsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
-            .padding(top = 16.dp)
+            .padding(top = 25.dp)
     ) {
         // Modern Header
         Row(
