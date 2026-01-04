@@ -7,6 +7,49 @@ const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
+// @route   POST /api/orders/upload-prescription
+// @desc    Upload prescription image
+// @access  Private
+router.post('/upload-prescription', [
+  require('../middleware/auth').protect
+], (req, res) => {
+  req.upload.single('prescription')(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({
+            success: false,
+            message: 'File too large. Maximum size is 5MB.'
+          });
+        }
+      }
+      return res.status(400).json({
+        success: false,
+        message: err.message || 'File upload failed'
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    // Return the file URL
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/prescriptions/${req.file.filename}`;
+
+    res.json({
+      success: true,
+      message: 'Prescription uploaded successfully',
+      data: {
+        url: fileUrl,
+        filename: req.file.filename
+      }
+    });
+  });
+});
+
 // @route   POST /api/orders
 // @desc    Create new order
 // @access  Private

@@ -1,10 +1,13 @@
 package tn.rnu.isetr.miniprojet.data
 
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -61,6 +64,10 @@ interface ApiService {
         @Path("id") orderId: String,
         @Body request: UpdateOrderStatusRequest
     ): Response<OrderResponse>
+
+    @Multipart
+    @POST("orders/upload-prescription")
+    suspend fun uploadPrescription(@Part prescription: MultipartBody.Part): Response<UploadResponse>
 
     @POST("orders")
     suspend fun createOrder(@Body request: OrderRequest): Response<OrderResponse>

@@ -50,6 +50,28 @@ import android.Manifest
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import android.content.Intent
+import android.provider.MediaStore
+import android.app.Activity
+import android.os.Environment
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.saveable.Saver
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import tn.rnu.isetr.miniprojet.data.RetrofitClient
+
+val PharmacySaver = Saver<Pharmacy, String>(
+    save = { it._id },
+    restore = { id -> Pharmacy(_id = id, name = "", address = "", phone = "", email = "", latitude = 0.0, longitude = 0.0, rating = 0.0, totalReviews = 0, stock = emptyList(), isActive = true, services = emptyList()) }
+)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -66,34 +88,105 @@ fun OrderScreen(
     var showMapPicker by remember { mutableStateOf(false) }
     var selectedLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var prescriptionUri by remember { mutableStateOf<Uri?>(null) }
-    var currentPhotoFile by remember { mutableStateOf<File?>(null) }
+    // We no longer need `currentPhotoFile` as a state variable.
+    // var currentPhotoFile by remember { mutableStateOf<File?>(null) }
+    var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var showPrescriptionDialog by remember { mutableStateOf(false) }
 
     val orderState by viewModel.orderState.collectAsState()
     val context = LocalContext.current
-
+    
     // Camera permission
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
+
+    // Function to create a temporary image file
+    fun createImageFile(): File {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val storageDir = context.cacheDir // Use internal cache directory
+        return File.createTempFile(
+            "JPEG_${timeStamp}_",
+            ".jpg",
+            storageDir
+        )
+    }
+
+    // Function to upload prescription to server
+    fun uploadPrescription(uri: Uri) {
+        GlobalScope.launch {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val tempFile = File(context.cacheDir, "temp_prescription_${timeStamp}.jpg")
+                val outputStream = FileOutputStream(tempFile)
+                inputStream?.use { input ->
+                    outputStream.use { output ->
+                        input.copyTo(output)
+                    }
+                }
+
+                val requestFile = tempFile.asRequestBody("image/*".toMediaTypeOrNull())
+                val body = MultipartBody.Part.createFormData("prescription", tempFile.name, requestFile)
+
+                val response = RetrofitClient.apiService.uploadPrescription(body)
+                if (response.isSuccessful) {
+                    val uploadData = response.body()?.data
+                    prescriptionUri = Uri.parse(uploadData?.url)
+                } else {
+                    // Handle error
+                    prescriptionUri = null
+                }
+
+                // Clean up temp file
+                tempFile.delete()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                prescriptionUri = null
+            }
+        }
+    }
+
+    // Function to get the latest image from MediaStore
+    fun getLatestImageFromMediaStore(): Uri? {
+        val projection = arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DATE_ADDED)
+        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+        context.contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            null,
+            null,
+            sortOrder
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
+                return Uri.withAppendedPath(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id.toString())
+            }
+        }
+        return null
+    }
 
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture(),
         onResult = { success ->
-            if (success) {
-                // Check if the file was actually created and has content
-                currentPhotoFile?.let { file ->
-                    if (file.exists() && file.length() > 0) {
-                        // prescriptionUri is already set
-                    } else {
-                        prescriptionUri = null
-                        currentPhotoFile = null
+            try {
+                if (success) {
+                    // Since some camera apps ignore the URI, query MediaStore for the latest image
+                    kotlinx.coroutines.GlobalScope.launch {
+                        kotlinx.coroutines.delay(1000) // Wait 1 second for MediaStore to index
+                        val latestImageUri = getLatestImageFromMediaStore()
+                        if (latestImageUri != null) {
+                            uploadPrescription(latestImageUri)
+                        } else {
+                            // Fallback to tempPhotoUri if available
+                            tempPhotoUri?.let { uri ->
+                                uploadPrescription(uri)
+                            }
+                        }
                     }
-                } ?: run {
-                    prescriptionUri = null
                 }
-            } else {
-                prescriptionUri = null
-                currentPhotoFile = null
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Handle error
             }
         }
     )
@@ -102,7 +195,9 @@ fun OrderScreen(
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri ->
-            prescriptionUri = uri
+            if (uri != null) {
+                uploadPrescription(uri)
+            }
         }
     )
 
@@ -132,6 +227,7 @@ fun OrderScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .padding(top = 16.dp)
     ) {
         // Modern Header
         Row(
@@ -456,23 +552,15 @@ fun OrderScreen(
                                             OutlinedButton(
                                                 onClick = {
                                                     if (cameraPermissionState.status.isGranted) {
-                                                        try {
-                                                            val photoFile = File(context.cacheDir, "prescription_${System.currentTimeMillis()}.jpg")
-                                                            photoFile.createNewFile()
-                                                            val photoUri = FileProvider.getUriForFile(
-                                                                context,
-                                                                "${context.packageName}.fileprovider",
-                                                                photoFile
-                                                            )
-                                                            prescriptionUri = photoUri
-                                                            currentPhotoFile = photoFile
-                                                            cameraLauncher.launch(photoUri)
-                                                            showPrescriptionDialog = false
-                                                        } catch (e: Exception) {
-                                                            // Handle error - could show a toast or log
-                                                            prescriptionUri = null
-                                                            currentPhotoFile = null
-                                                        }
+                                                        val photoFile = createImageFile()
+                                                        val photoUri = FileProvider.getUriForFile(
+                                                            context,
+                                                            "${context.packageName}.fileprovider",
+                                                            photoFile
+                                                        )
+                                                        tempPhotoUri = photoUri
+                                                        cameraLauncher.launch(photoUri)
+                                                        showPrescriptionDialog = false
                                                     } else {
                                                         cameraPermissionState.launchPermissionRequest()
                                                     }

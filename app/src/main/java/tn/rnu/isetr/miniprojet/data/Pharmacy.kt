@@ -1,5 +1,9 @@
 package tn.rnu.isetr.miniprojet.data
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
 data class Pharmacy(
     val _id: String,
     val name: String,
@@ -13,15 +17,17 @@ data class Pharmacy(
     val stock: List<PharmacyStock> = emptyList(),
     val isActive: Boolean = true,
     val services: List<String> = emptyList()
-)
+) : Parcelable
 
+@Parcelize
 data class PharmacyStock(
     val medicine: Medicine,
     val stock: Int,
     val price: Double,
     val lastUpdated: String? = null
-)
+) : Parcelable
 
+@Parcelize
 data class Medicine(
     val _id: String,
     val name: String,
@@ -31,7 +37,7 @@ data class Medicine(
     val requiresPrescription: Boolean = false,
     val price: Double = 0.0,
     val imageUrl: String? = null
-)
+) : Parcelable
 
 data class PharmacyResponse(
     val success: Boolean,

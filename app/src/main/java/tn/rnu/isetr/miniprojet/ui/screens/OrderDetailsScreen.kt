@@ -15,11 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import tn.rnu.isetr.miniprojet.data.Order
 import tn.rnu.isetr.miniprojet.viewmodel.OrderViewModel
 
@@ -34,6 +36,7 @@ fun OrderDetailsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .padding(top = 16.dp)
     ) {
         // Modern Header
         Row(
@@ -223,6 +226,33 @@ fun OrderDetailsScreen(
                                 color = Color(0xFF0F172A),
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+
+                        if (order.prescriptionUrl != null) {
+                            Divider(
+                                color = Color(0xFFF1F5F9),
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(vertical = 12.dp)
+                            )
+
+                            Text(
+                                text = "Prescription",
+                                fontSize = 12.sp,
+                                color = Color(0xFF64748B),
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            AsyncImage(
+                                model = order.prescriptionUrl,
+                                contentDescription = "Prescription Image",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .padding(top = 8.dp)
+                                    .background(Color(0xFFF8FAFC), RoundedCornerShape(8.dp))
+                                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Fit
                             )
                         }
                     }

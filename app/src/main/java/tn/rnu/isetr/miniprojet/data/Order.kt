@@ -53,3 +53,14 @@ data class OrderListResponse(
     val pagination: Pagination? = null,
     val message: String? = null
 )
+
+data class UploadResponse(
+    val success: Boolean,
+    val message: String,
+    val data: UploadData
+)
+
+data class UploadData(
+    val url: String,
+    val filename: String
+)
