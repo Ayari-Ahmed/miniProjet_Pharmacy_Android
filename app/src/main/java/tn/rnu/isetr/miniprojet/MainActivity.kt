@@ -4,37 +4,62 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.outlined.AccountBox
+import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import tn.rnu.isetr.miniprojet.data.Order
 import tn.rnu.isetr.miniprojet.data.Pharmacy
 import tn.rnu.isetr.miniprojet.ui.screens.HomeScreen
@@ -82,6 +107,9 @@ fun MiniProjetApp(preferencesManager: PreferencesManager) {
     var currentPharmacyScreen by rememberSaveable { mutableStateOf<PharmacyScreen?>(null) }
 
     val onLogout = {
+        // Clear preferences first
+        preferencesManager.logout()
+        // Then update all states atomically
         isLoggedIn = false
         isPharmacyLoggedIn = false
         showLogin = true
@@ -91,7 +119,6 @@ fun MiniProjetApp(preferencesManager: PreferencesManager) {
         selectedOrder = null
         currentPharmacy = null
         currentPharmacyScreen = null
-        preferencesManager.logout()
     }
 
     // Handle order placement first (highest priority)
@@ -225,55 +252,142 @@ fun MainApp(onOrderClick: (Pharmacy) -> Unit, onOrderDetailsClick: (Order) -> Un
     val user = preferencesManager.getUser()
     val context = LocalContext.current
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            Surface(modifier = Modifier.fillMaxSize(), color = Color.White, tonalElevation = 0.dp) {
-                NavigationSuiteScaffold(
-                    navigationSuiteColors = NavigationSuiteDefaults.colors(
-                        navigationBarContainerColor = Color.White,
-                        navigationBarContentColor = Color(0xFF0DFF9D),
-                        navigationDrawerContainerColor = Color.White
-                    ),
-                    navigationSuiteItems = {
-                        AppDestinations.entries.forEach {
-                            item(
-                                icon = {
-                                    Icon(
-                                        it.icon,
-                                        contentDescription = it.label
-                                    )
-                                },
-                                label = { Text(it.label) },
-                                selected = it == currentDestination,
-                                onClick = { currentDestination = it }
-                            )
-                        }
-                    }
-                ) {
-                    when (currentDestination) {
-                        AppDestinations.HOME -> HomeScreen(
-                            modifier = Modifier.padding(innerPadding),
-                            preferencesManager = preferencesManager,
-                            onLogout = onLogout
-                        )
-                        AppDestinations.PHARMACIES -> PharmaciesScreen(
-                            modifier = Modifier.padding(innerPadding),
-                            onOrderClick = onOrderClick,
-                            preferencesManager = preferencesManager
-                        )
-                        AppDestinations.MAP -> MapScreen(modifier = Modifier.padding(innerPadding))
-                        AppDestinations.ORDERS -> OrdersScreen(
-                            modifier = Modifier.padding(innerPadding),
-                            onOrderClick = onOrderDetailsClick
-                        )
-                        AppDestinations.PROFILE -> ProfileScreen(
-                            modifier = Modifier.padding(innerPadding),
-                            preferencesManager = preferencesManager,
-                            onLogout = onLogout
-                        )
-                    }
-                }
+    Scaffold(
+        bottomBar = {
+            ModernNavigationBar(
+                currentDestination = currentDestination,
+                onDestinationSelected = { currentDestination = it }
+            )
+        },
+        containerColor = Color(0xFFF8FAFC)
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            when (currentDestination) {
+                AppDestinations.HOME -> HomeScreen(
+                    preferencesManager = preferencesManager,
+                    onLogout = onLogout
+                )
+                AppDestinations.PHARMACIES -> PharmaciesScreen(
+                    onOrderClick = onOrderClick,
+                    preferencesManager = preferencesManager
+                )
+                AppDestinations.MAP -> MapScreen()
+                AppDestinations.ORDERS -> OrdersScreen(
+                    onOrderClick = onOrderDetailsClick
+                )
+                AppDestinations.PROFILE -> ProfileScreen(
+                    preferencesManager = preferencesManager,
+                    onLogout = onLogout
+                )
             }
+        }
+    }
+}
+
+@Composable
+fun ModernNavigationBar(
+    currentDestination: AppDestinations,
+    onDestinationSelected: (AppDestinations) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 40.dp)
+            .shadow(
+                elevation = 12.dp,
+                spotColor = Color(0xFF10B981).copy(alpha = 0.15f),
+                ambientColor = Color(0xFF10B981).copy(alpha = 0.1f)
+            ),
+        color = Color.White
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(70.dp)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AppDestinations.entries.forEach { destination ->
+                val isSelected = destination == currentDestination
+                val icon = if (isSelected) destination.selectedIcon else destination.icon
+
+                ModernNavigationItem(
+                    icon = icon,
+                    label = destination.label,
+                    isSelected = isSelected,
+                    onClick = { onDestinationSelected(destination) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ModernNavigationItem(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) {
+        Brush.horizontalGradient(
+            colors = listOf(
+                Color(0xFF10B981),
+                Color(0xFF059669)
+            )
+        )
+    } else {
+        Brush.horizontalGradient(
+            colors = listOf(Color.Transparent, Color.Transparent)
+        )
+    }
+
+    val iconColor = if (isSelected) Color.White else Color(0xFF94A3B8)
+    val textColor = if (isSelected) Color(0xFF10B981) else Color(0xFF94A3B8)
+
+    Box(
+        modifier = Modifier
+            .width(65.dp)
+            .height(54.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(backgroundColor)
+            .then(
+                if (isSelected) {
+                    Modifier.shadow(
+                        elevation = 8.dp,
+                        spotColor = Color(0xFF10B981).copy(alpha = 0.4f),
+                        ambientColor = Color(0xFF10B981).copy(alpha = 0.2f)
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = iconColor,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = textColor,
+                letterSpacing = 0.2.sp
+            )
         }
     }
 }
@@ -281,12 +395,13 @@ fun MainApp(onOrderClick: (Pharmacy) -> Unit, onOrderDetailsClick: (Order) -> Un
 enum class AppDestinations(
     val label: String,
     val icon: ImageVector,
+    val selectedIcon: ImageVector,
 ) {
-    HOME("Home", Icons.Default.Home),
-    PHARMACIES("Pharmacies", Icons.Default.Favorite),
-    MAP("Map", Icons.Default.LocationOn),
-    ORDERS("Orders", Icons.Default.AccountBox),
-    PROFILE("Profile", Icons.Default.AccountBox),
+    HOME("Home", Icons.Outlined.Home, Icons.Default.Home),
+    PHARMACIES("Pharmacies", Icons.Outlined.Favorite, Icons.Default.Favorite),
+    MAP("Map", Icons.Outlined.LocationOn, Icons.Default.LocationOn),
+    ORDERS("Orders", Icons.Outlined.AccountBox, Icons.Default.AccountBox),
+    PROFILE("Profile", Icons.Outlined.AccountBox, Icons.Default.AccountBox),
 }
 
 enum class PharmacyScreen {

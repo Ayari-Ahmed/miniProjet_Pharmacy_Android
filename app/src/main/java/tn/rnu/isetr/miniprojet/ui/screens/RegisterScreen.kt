@@ -1,21 +1,27 @@
 package tn.rnu.isetr.miniprojet.ui.screens
 
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -28,6 +34,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import tn.rnu.isetr.miniprojet.data.PreferencesManager
+import tn.rnu.isetr.miniprojet.ui.theme.*
 import tn.rnu.isetr.miniprojet.viewmodel.AuthState
 import tn.rnu.isetr.miniprojet.viewmodel.AuthViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -60,12 +67,17 @@ fun RegisterScreen(
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf<String?>(null) }
     var showMapPicker by remember { mutableStateOf(false) }
     var selectedLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var currentLocation by remember { mutableStateOf<GeoPoint?>(null) }
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var confirmPasswordError by remember { mutableStateOf<String?>(null) }
 
     // Location permissions
     val locationPermissionsState = rememberMultiplePermissionsState(
@@ -76,6 +88,18 @@ fun RegisterScreen(
     )
 
     val authState by viewModel.authState.collectAsState()
+
+    // Animation for logo
+    val infiniteTransition = rememberInfiniteTransition(label = "logo animation")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
 
     LaunchedEffect(authState) {
         when (authState) {
@@ -92,201 +116,174 @@ fun RegisterScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 32.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        // Header Section
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(top = 20.dp)
-        ) {
-            // Logo
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .shadow(8.dp, CircleShape)
-            ) {
-                // Glow effect
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF10B981).copy(alpha = 0.15f), CircleShape)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        AppColors.PrimaryExtraPale,
+                        AppColors.Background
+                    )
                 )
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Animated Logo Section
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(vertical = 10.dp)
+            ) {
+                // Logo with glow effect
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.White, CircleShape)
-                        .border(2.dp, Color(0xFF10B981), CircleShape),
+                        .size(80.dp)
+                        .scale(scale)
+                        .background(
+                            AppColors.PrimaryGradient,
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Inner glow
+                    Box(
+                        modifier = Modifier
+                            .size(70.dp)
+                            .background(
+                                Color.White.copy(alpha = 0.2f),
+                                CircleShape
+                            )
+                    )
                     Icon(
-                        imageVector = Icons.Default.Home,
-                        contentDescription = "Pharmacy",
-                        tint = Color(0xFF10B981),
-                        modifier = Modifier.size(32.dp)
+                        imageVector = Icons.Outlined.Home,
+                        contentDescription = "MediCare",
+                        tint = Color.White,
+                        modifier = Modifier.size(40.dp)
                     )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Create Account",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = AppColors.TextPrimary,
+                    letterSpacing = (-0.5).sp
+                )
+
+                Text(
+                    text = "Join MediCare today",
+                    fontSize = 14.sp,
+                    color = AppColors.TextSecondary,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "MediCare",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.5).sp
-                ),
-                color = Color(0xFF0F172A)
-            )
-
-            Text(
-                text = "Healthcare at your fingertips",
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF64748B),
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        // Main Content
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Input Card
+            // Register Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9))
+                shape = AppShapes.ExtraLarge,
+                colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                border = BorderStroke(1.dp, AppColors.BorderLight)
             ) {
                 Column(
                     modifier = Modifier
-                        .padding(24.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "Full Name",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.2.sp
-                        ),
-                        color = Color(0xFF334155)
-                    )
-
-                    OutlinedTextField(
+                    // Name Field
+                    ModernTextField(
                         value = name,
-                        onValueChange = { name = it },
-                        placeholder = { Text("Enter your full name", color = Color(0xFF94A3B8)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
-                            unfocusedBorderColor = Color(0xFFE2E8F0),
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color(0xFFF8FAFC)
-                        ),
-                        shape = MaterialTheme.shapes.medium
+                        onValueChange = {
+                            name = it
+                            nameError = if (it.isBlank()) "Name is required" else null
+                        },
+                        label = "Full Name",
+                        icon = Icons.Outlined.Person,
+                        errorMessage = nameError
                     )
 
-                    Text(
-                        text = "Email Address",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.2.sp
-                        ),
-                        color = Color(0xFF334155)
-                    )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    OutlinedTextField(
+                    // Email Field
+                    ModernTextField(
                         value = email,
-                        onValueChange = { email = it },
-                        placeholder = { Text("you@example.com", color = Color(0xFF94A3B8)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
-                            unfocusedBorderColor = Color(0xFFE2E8F0),
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color(0xFFF8FAFC)
-                        ),
-                        shape = MaterialTheme.shapes.medium
+                        onValueChange = {
+                            email = it
+                            emailError = if (it.isBlank()) "Email is required" else null
+                        },
+                        label = "Email Address",
+                        icon = Icons.Outlined.Email,
+                        errorMessage = emailError
                     )
 
-                    Text(
-                        text = "Password",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.2.sp
-                        ),
-                        color = Color(0xFF334155)
-                    )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    OutlinedTextField(
+                    // Password Field
+                    ModernTextField(
                         value = password,
-                        onValueChange = { password = it },
-                        placeholder = { Text("Create a password", color = Color(0xFF94A3B8)) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
-                            unfocusedBorderColor = Color(0xFFE2E8F0),
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color(0xFFF8FAFC)
-                        ),
-                        shape = MaterialTheme.shapes.medium
+                        onValueChange = {
+                            password = it
+                            passwordError = if (it.isBlank()) "Password is required" else null
+                        },
+                        label = "Password",
+                        icon = Icons.Outlined.Lock,
+                        isPassword = true,
+                        errorMessage = passwordError
                     )
 
-                    Text(
-                        text = "Phone Number (Optional)",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.2.sp
-                        ),
-                        color = Color(0xFF334155)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Confirm Password Field
+                    ModernTextField(
+                        value = confirmPassword,
+                        onValueChange = {
+                            confirmPassword = it
+                            confirmPasswordError = if (it != password) "Passwords do not match" else null
+                        },
+                        label = "Confirm Password",
+                        icon = Icons.Outlined.Lock,
+                        isPassword = true,
+                        errorMessage = confirmPasswordError
                     )
 
-                    OutlinedTextField(
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Phone Field
+                    ModernTextField(
                         value = phone,
                         onValueChange = { phone = it },
-                        placeholder = { Text("+216 XX XXX XXX", color = Color(0xFF94A3B8)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF10B981),
-                            unfocusedBorderColor = Color(0xFFE2E8F0),
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color(0xFFF8FAFC)
-                        ),
-                        shape = MaterialTheme.shapes.medium
+                        label = "Phone Number (Optional)",
+                        icon = Icons.Outlined.Phone
                     )
 
-                    Text(
-                        text = "Address (Optional)",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.2.sp
-                        ),
-                        color = Color(0xFF334155)
-                    )
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
+                    // Address Field with Location Picker
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ModernTextField(
                             value = address,
                             onValueChange = { address = it },
-                            placeholder = { Text("Your address", color = Color(0xFF94A3B8)) },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF10B981),
-                                unfocusedBorderColor = Color(0xFFE2E8F0),
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color(0xFFF8FAFC)
-                            ),
-                            shape = MaterialTheme.shapes.medium
+                            label = "Address (Optional)",
+                            icon = Icons.Outlined.LocationOn,
+                            isReadOnly = true
                         )
+
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         OutlinedButton(
                             onClick = {
@@ -304,73 +301,119 @@ fun RegisterScreen(
                                     showMapPicker = true
                                 }
                             },
-                            modifier = Modifier.width(120.dp),
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                            shape = AppShapes.Medium,
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Color(0xFF10B981)
+                                contentColor = AppColors.Primary
                             ),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981))
+                            border = BorderStroke(1.dp, AppColors.Primary)
                         ) {
-                            Text("Pick Location", fontSize = 12.sp)
+                            Icon(
+                                imageVector = Icons.Outlined.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Pick Location on Map", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Error Message
                     showError?.let {
-                        Text(
-                            text = it,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = AppShapes.Medium,
+                            colors = CardDefaults.cardColors(
+                                containerColor = AppColors.Error.copy(alpha = 0.1f)
+                            ),
+                            border = BorderStroke(1.dp, AppColors.Error.copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Warning,
+                                    contentDescription = null,
+                                    tint = AppColors.Error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = it,
+                                    fontSize = 13.sp,
+                                    color = AppColors.Error,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
 
-                    Button(
+                    // Register Button
+                    PrimaryButton(
+                        text = "Create Account",
                         onClick = {
                             showError = null
-                            viewModel.register(name, email, password, phone.takeIf { it.isNotBlank() }, address.takeIf { it.isNotBlank() })
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = authState !is AuthState.Loading && name.isNotBlank() && email.isNotBlank() && password.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF10B981)
-                        ),
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = 6.dp,
-                            pressedElevation = 2.dp
-                        )
-                    ) {
-                        if (authState is AuthState.Loading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = Color.White
-                            )
-                        } else {
-                            Text(
-                                "Create Account",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp
+                            nameError = if (name.isBlank()) "Name is required" else null
+                            emailError = if (email.isBlank()) "Email is required" else null
+                            passwordError = if (password.isBlank()) "Password is required" else null
+                            confirmPasswordError = if (password != confirmPassword) "Passwords do not match" else null
+
+                            if (name.isNotBlank() && email.isNotBlank() && password.isNotBlank() && password == confirmPassword) {
+                                viewModel.register(
+                                    name,
+                                    email,
+                                    password,
+                                    phone.takeIf { it.isNotBlank() },
+                                    address.takeIf { it.isNotBlank() }
                                 )
-                            )
-                        }
-                    }
+                            }
+                        },
+                        icon = Icons.Outlined.ArrowForward,
+                        isLoading = authState is AuthState.Loading,
+                        enabled = name.isNotBlank() && email.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank()
+                    )
                 }
             }
-        }
 
-        // Footer
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            TextButton(onClick = onNavigateToLogin) {
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Login Link
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    "Already have an account? Sign In",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF64748B)
+                    text = "Already have an account?",
+                    fontSize = 14.sp,
+                    color = AppColors.TextSecondary,
+                    fontWeight = FontWeight.Medium
                 )
+                TextButton(
+                    onClick = onNavigateToLogin,
+                    contentPadding = PaddingValues(4.dp)
+                ) {
+                    Text(
+                        text = "Sign In",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.Primary
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 
     // Map Picker Dialog
     if (showMapPicker) {
-        val context = LocalContext.current
         AlertDialog(
             onDismissRequest = { showMapPicker = false },
             title = { Text("Select Location") },

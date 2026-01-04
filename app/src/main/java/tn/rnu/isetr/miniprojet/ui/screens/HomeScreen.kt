@@ -1,14 +1,21 @@
 package tn.rnu.isetr.miniprojet.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,10 +26,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import tn.rnu.isetr.miniprojet.data.Order
+import tn.rnu.isetr.miniprojet.data.Pharmacy
 import tn.rnu.isetr.miniprojet.data.PreferencesManager
+import tn.rnu.isetr.miniprojet.data.User
+import tn.rnu.isetr.miniprojet.ui.theme.*
 import tn.rnu.isetr.miniprojet.viewmodel.AuthViewModel
 import tn.rnu.isetr.miniprojet.viewmodel.OrderViewModel
 import tn.rnu.isetr.miniprojet.viewmodel.OrderState
@@ -35,12 +47,16 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     preferencesManager: PreferencesManager,
     onLogout: () -> Unit,
+    onPharmacyClick: (Pharmacy) -> Unit = {},
+    onOrdersClick: () -> Unit = {},
+    onOrderDetailsClick: (Order) -> Unit = {},
     pharmacyViewModel: PharmacyViewModel = viewModel(),
     orderViewModel: OrderViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
     val pharmacyState by pharmacyViewModel.pharmacyState.collectAsState()
     val orderState by orderViewModel.orderState.collectAsState()
+    val user = remember { preferencesManager.getUser() }
 
     // Dynamic stats
     val pharmaciesCount = when (pharmacyState) {
@@ -53,10 +69,15 @@ fun HomeScreen(
         else -> 0
     }
 
-    val stats = listOf(
-        StatItem("Pharmacies", pharmaciesCount.toString(), Icons.Default.Place, Color(0xFF3B82F6)),
-        StatItem("Orders", ordersCount.toString(), Icons.Default.ShoppingCart, Color(0xFF10B981)),
-    )
+    val recentOrders = when (orderState) {
+        is OrderState.OrdersLoaded -> (orderState as OrderState.OrdersLoaded).orders.take(3)
+        else -> emptyList()
+    }
+
+    val nearbyPharmacies = when (pharmacyState) {
+        is PharmacyState.Success -> (pharmacyState as PharmacyState.Success).pharmacies.take(4)
+        else -> emptyList()
+    }
 
     LaunchedEffect(Unit) {
         pharmacyViewModel.getPharmacies()
@@ -66,354 +87,546 @@ fun HomeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(AppColors.Background)
             .verticalScroll(rememberScrollState())
+            .padding(top = 20.dp)
     ) {
-        // Glassmorphic Header
+        // Header with gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Color.White,
-                    RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
-                )
-                .shadow(4.dp, RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp))
-                .padding(bottom = 40.dp)
+                .background(AppColors.PrimaryGradient)
+                .padding(horizontal = 20.dp, vertical = 24.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)
-            ) {
-                // Header Top
+            Column {
+                // Top bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = "Welcome back",
-                            fontSize = 14.sp,
-                            color = Color(0xFF64748B),
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "MediCare User", // TODO: Use actual user name
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF0F172A),
-                            letterSpacing = (-0.5).sp
-                        )
-                        // Status Badge
-                        Row(
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
                             modifier = Modifier
-                                .background(Color(0xFFECFDF5), RoundedCornerShape(20.dp))
-                                .border(1.dp, Color(0xFFA7F3D0), RoundedCornerShape(20.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .size(50.dp)
+                                .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                                .border(2.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .background(Color(0xFF10B981), CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Active",
-                                fontSize = 11.sp,
-                                color = Color(0xFF065F46),
-                                fontWeight = FontWeight.Bold
+                                text = user?.name?.firstOrNull()?.uppercaseChar()?.toString() ?: "U",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "Hello, ${user?.name?.split(" ")?.firstOrNull() ?: "User"}!",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Find your medicines",
+                                fontSize = 13.sp,
+                                color = AppColors.PrimaryPale,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
 
-                    // Logout Button
-                    IconButton(
-                        onClick = onLogout,
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        IconButton(
+                            onClick = { /* TODO: Notifications */ },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.Notifications,
+                                contentDescription = "Notifications",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                onLogout()
+                            },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.ExitToApp,
+                                contentDescription = "Logout",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Search Bar
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = AppShapes.Large,
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Row(
                         modifier = Modifier
-                            .background(Color(0xFFFEF2F2), RoundedCornerShape(14.dp))
-                            .border(1.dp, Color(0xFFFECACA), RoundedCornerShape(14.dp))
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            Icons.Default.ExitToApp,
-                            contentDescription = "Logout",
-                            tint = Color(0xFFEF4444)
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            tint = AppColors.TextTertiary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Search medicines, pharmacies...",
+                            fontSize = 14.sp,
+                            color = AppColors.TextTertiary,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-                // Quick Stats
+                // Stats Cards
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    stats.forEach { stat ->
-                        StatCard(stat, modifier = Modifier.weight(1f))
-                    }
+                    StatCardNew(
+                        title = "Pharmacies",
+                        value = pharmaciesCount.toString(),
+                        icon = Icons.Outlined.Place,
+                        color = AppColors.Secondary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    StatCardNew(
+                        title = "My Orders",
+                        value = ordersCount.toString(),
+                        icon = Icons.Default.ShoppingCart,
+                        color = AppColors.Primary,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Main Content
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Color.White,
-                    RoundedCornerShape(topStart = 40.dp, topEnd = 40.dp)
-                )
-                .padding(horizontal = 24.dp, vertical = 28.dp)
+                .padding(horizontal = 20.dp)
         ) {
-            // Section Header
+            // Quick Actions Section
+            SectionHeader(
+                title = "Quick Actions",
+                icon = Icons.Outlined.Star
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Cards
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 20.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ActionCard(
+                    title = "Browse Pharmacies",
+                    description = "Find nearby pharmacies",
+                    icon = Icons.Outlined.Place,
+                    color = AppColors.Primary,
+                    modifier = Modifier.weight(1f),
+                    onClick = { /* Navigate to pharmacies */ }
+                )
+                ActionCard(
+                    title = "My Orders",
+                    description = "Track your orders",
+                    icon = Icons.Default.ShoppingCart,
+                    color = AppColors.Secondary,
+                    modifier = Modifier.weight(1f),
+                    onClick = onOrdersClick
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Nearby Pharmacies Section
+            SectionHeader(
+                title = "Nearby Pharmacies",
+                subtitle = "Closest to your location",
+                icon = Icons.Outlined.Place,
+                actionText = "See All",
+                onActionClick = { /* Navigate to all pharmacies */ }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (nearbyPharmacies.isEmpty()) {
+                EmptyStateCard(
+                    icon = Icons.Outlined.Place,
+                    title = "No Pharmacies Found",
+                    message = "Pharmacies will appear here once available"
+                )
+            } else {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
+                ) {
+                    items(nearbyPharmacies) { pharmacy ->
+                        PharmacyCardCompact(
+                            pharmacy = pharmacy,
+                            onClick = { onPharmacyClick(pharmacy) }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Recent Orders Section
+            SectionHeader(
+                title = "Recent Orders",
+                subtitle = "Your latest purchases",
+                icon = Icons.Outlined.ShoppingCart,
+                actionText = "View All",
+                onActionClick = onOrdersClick
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (recentOrders.isEmpty()) {
+                EmptyStateCard(
+                    icon = Icons.Default.ShoppingCart,
+                    title = "No Orders Yet",
+                    message = "Start ordering medicines to see them here"
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    recentOrders.forEach { order ->
+                        OrderCardCompact(
+                            order = order,
+                            onClick = { onOrderDetailsClick(order) }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Health Tips Section
+            InfoCard(
+                icon = Icons.Outlined.Favorite,
+                title = "Health Tip of the Day",
+                description = "Stay hydrated! Drink at least 8 glasses of water daily to maintain good health.",
+                backgroundColor = AppColors.PrimaryExtraPale,
+                iconColor = AppColors.Primary
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+fun StatCardNew(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = AppShapes.Large,
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(color.copy(alpha = 0.15f), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.Star,
+                    icon,
                     contentDescription = null,
-                    tint = Color(0xFF10B981),
-                    modifier = Modifier.size(20.dp)
+                    tint = color,
+                    modifier = Modifier.size(24.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column {
                 Text(
-                    text = "Quick Actions",
-                    fontSize = 18.sp,
+                    text = value,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F172A),
-                    letterSpacing = 0.3.sp
+                    color = AppColors.TextPrimary
                 )
-            }
-
-            // Primary Action - Browse Pharmacies
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 20.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF10B981))
-            ) {
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    // Glow effect
-                    Box(
-                        modifier = Modifier
-                            .size(150.dp)
-                            .background(Color.White.copy(alpha = 0.1f), CircleShape)
-                            .align(Alignment.TopEnd)
-                            .offset(x = 50.dp, y = (-50).dp)
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(18.dp))
-                                    .padding(16.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Place,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column {
-                                Text(
-                                    text = "Browse Pharmacies",
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color.White,
-                                    letterSpacing = 0.5.sp
-                                )
-                                Text(
-                                    text = "Find medicines near you",
-                                    fontSize = 13.sp,
-                                    color = Color(0xFFD1FAE5),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                                .size(48.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "→",
-                                fontSize = 24.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Secondary Action - My Orders
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 20.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFDBEAFE))
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .background(Color(0xFFF8FAFC), RoundedCornerShape(14.dp))
-                                .padding(12.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.ShoppingCart,
-                                contentDescription = null,
-                                tint = Color(0xFF3B82F6),
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        Icon(
-                            Icons.Default.KeyboardArrowUp,
-                            contentDescription = null,
-                            tint = Color(0xFF3B82F680),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "My Orders",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF0F172A),
-                        letterSpacing = 0.3.sp
-                    )
-
-                    Text(
-                        text = "Track your prescriptions",
-                        fontSize = 12.sp,
-                        color = Color(0xFF64748B),
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp)
-                            .background(Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
-                            .padding(vertical = 8.dp, horizontal = 12.dp)
-                    ) {
-                        Text(
-                            text = "View Orders →",
-                            fontSize = 13.sp,
-                            color = Color(0xFF3B82F6),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // Tip Card
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFECFDF5), RoundedCornerShape(16.dp))
-                    .border(1.dp, Color(0xFFA7F3D0), RoundedCornerShape(16.dp))
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(Color.White, RoundedCornerShape(10.dp))
-                        .padding(8.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Star,
-                        contentDescription = null,
-                        tint = Color(0xFF10B981),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Tip: Use the bottom navigation to quickly access different sections",
-                    fontSize = 13.sp,
-                    color = Color(0xFF064E3B),
-                    fontWeight = FontWeight.Medium,
-                    lineHeight = 18.sp,
-                    modifier = Modifier.weight(1f)
+                    text = title,
+                    fontSize = 12.sp,
+                    color = AppColors.TextSecondary,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
     }
 }
 
-data class StatItem(
-    val label: String,
-    val value: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val color: Color
-)
-
 @Composable
-fun StatCard(stat: StatItem, modifier: Modifier = Modifier) {
+fun ActionCard(
+    title: String,
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = AppShapes.Large,
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9))
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, AppColors.BorderLight)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(
                 modifier = Modifier
-                    .background(stat.color.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                    .padding(8.dp)
+                    .size(56.dp)
+                    .background(color.copy(alpha = 0.15f), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    stat.icon,
+                    icon,
                     contentDescription = null,
-                    tint = stat.color,
-                    modifier = Modifier.size(16.dp)
+                    tint = color,
+                    modifier = Modifier.size(28.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = stat.value,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF0F172A)
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.TextPrimary,
+                textAlign = TextAlign.Center
             )
 
             Text(
-                text = stat.label,
+                text = description,
                 fontSize = 11.sp,
-                color = Color(0xFF64748B),
-                fontWeight = FontWeight.SemiBold
+                color = AppColors.TextSecondary,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun PharmacyCardCompact(
+    pharmacy: Pharmacy,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(200.dp)
+            .clickable(onClick = onClick),
+        shape = AppShapes.Large,
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, AppColors.BorderLight)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Avatar
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(AppColors.SecondaryPale, CircleShape)
+                    .border(2.dp, AppColors.SecondaryLight, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Ph",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.Secondary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Name
+            Text(
+                text = pharmacy.name,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = AppColors.TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Address
+            Text(
+                text = pharmacy.address,
+                fontSize = 11.sp,
+                color = AppColors.TextSecondary,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Status
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(AppColors.Primary, CircleShape)
+                )
+                Text(
+                    text = "Open",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AppColors.Primary
+                )
+                Text(
+                    text = "• 2.3 km",
+                    fontSize = 11.sp,
+                    color = AppColors.TextTertiary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun OrderCardCompact(
+    order: Order,
+    onClick: () -> Unit
+) {
+    val statusColor = when (order.status.lowercase()) {
+        "pending" -> AppColors.Info
+        "confirmed" -> AppColors.Purple
+        "processing", "preparing" -> AppColors.Warning
+        "ready", "delivered" -> AppColors.Success
+        "cancelled" -> AppColors.Error
+        else -> AppColors.TextSecondary
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = AppShapes.Large,
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, AppColors.BorderLight)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Status Icon
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(statusColor.copy(alpha = 0.15f), AppShapes.Medium),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = when (order.status.lowercase()) {
+                        "pending" -> Icons.Outlined.Info
+                        "confirmed" -> Icons.Outlined.CheckCircle
+                        "processing", "preparing" -> Icons.Outlined.Edit
+                        "ready", "delivered" -> Icons.Outlined.Check
+                        "cancelled" -> Icons.Outlined.Close
+                        else -> Icons.Outlined.ShoppingCart
+                    },
+                    contentDescription = null,
+                    tint = statusColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Order Info
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Order #${order._id.takeLast(6).uppercase()}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.TextPrimary
+                )
+                Text(
+                    text = "${order.items.size} items • $${String.format("%.2f", order.totalAmount)}",
+                    fontSize = 12.sp,
+                    color = AppColors.TextSecondary,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            // Status Badge
+            StatusBadge(
+                text = order.status.replaceFirstChar { it.uppercase() },
+                status = when (order.status.lowercase()) {
+                    "pending" -> StatusType.INFO
+                    "confirmed" -> StatusType.PURPLE
+                    "processing", "preparing" -> StatusType.WARNING
+                    "ready", "delivered" -> StatusType.SUCCESS
+                    "cancelled" -> StatusType.ERROR
+                    else -> StatusType.INFO
+                }
             )
         }
     }

@@ -64,6 +64,7 @@ fun PharmaciesScreen(
         modifier = modifier
             .fillMaxSize()
             .background(Color.White)
+            .padding(top = 16.dp)
     ) {
         // Compact Header
         Row(
