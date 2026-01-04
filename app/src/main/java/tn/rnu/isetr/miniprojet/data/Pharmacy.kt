@@ -52,3 +52,17 @@ data class Pagination(
     val total: Int,
     val pages: Int
 )
+
+data class MedicineListResponse(
+    val success: Boolean,
+    val message: String,
+    val data: List<Medicine>? = null,
+    val errors: List<String>? = null
+)
+
+data class PharmacyStockResponse(
+    val success: Boolean,
+    val message: String,
+    val data: List<PharmacyStock>? = null,
+    val errors: List<String>? = null
+)

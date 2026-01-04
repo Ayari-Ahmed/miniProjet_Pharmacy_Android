@@ -101,6 +101,130 @@ router.get('/', [
   }
 });
 
+// @route   GET /api/pharmacies/medicines
+// @desc    Get all medicines for pharmacy stock management
+// @access  Private (Pharmacy)
+router.get('/medicines', protect, async (req, res) => {
+  try {
+    const medicines = await Medicine.find({ isActive: true })
+      .select('name genericName category requiresPrescription price')
+      .sort({ name: 1 });
+
+    res.json({
+      success: true,
+      data: medicines
+    });
+  } catch (error) {
+    console.error('Get medicines error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   GET /api/pharmacies/search/medicines
+// @desc    Search medicines across pharmacies
+// @access  Public
+router.get('/search/medicines', [
+  query('q').trim().isLength({ min: 1 }).withMessage('Search query required'),
+  query('latitude').optional().isFloat(),
+  query('longitude').optional().isFloat(),
+  query('radius').optional().isFloat({ min: 0 }),
+  query('limit').optional().isInt({ min: 1, max: 50 })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const {
+      q,
+      latitude,
+      longitude,
+      radius = 10,
+      limit = 20
+    } = req.query;
+
+    let locationFilter = {};
+    if (latitude && longitude) {
+      locationFilter = {
+        location: {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [parseFloat(longitude), parseFloat(latitude)]
+            },
+            $maxDistance: parseFloat(radius) * 1000
+          }
+        }
+      };
+    }
+
+    const pharmacies = await Pharmacy.find({
+      ...locationFilter,
+      isActive: true,
+      stock: {
+        $elemMatch: {
+          stock: { $gt: 0 },
+          medicine: {
+            $in: await Medicine.find({
+              $or: [
+                { name: { $regex: q, $options: 'i' } },
+                { genericName: { $regex: q, $options: 'i' } }
+              ],
+              isActive: true
+            }).distinct('_id')
+          }
+        }
+      }
+    })
+    .populate('stock.medicine', 'name genericName category requiresPrescription price')
+    .select('name address phone latitude longitude stock')
+    .limit(parseInt(limit));
+
+    // Filter and format results
+    const results = [];
+    pharmacies.forEach(pharmacy => {
+      pharmacy.stock.forEach(stockItem => {
+        if (stockItem.stock > 0 &&
+            (stockItem.medicine.name.toLowerCase().includes(q.toLowerCase()) ||
+             (stockItem.medicine.genericName && stockItem.medicine.genericName.toLowerCase().includes(q.toLowerCase())))) {
+          results.push({
+            pharmacy: {
+              _id: pharmacy._id,
+              name: pharmacy.name,
+              address: pharmacy.address,
+              phone: pharmacy.phone,
+              latitude: pharmacy.latitude,
+              longitude: pharmacy.longitude
+            },
+            medicine: stockItem.medicine,
+            stock: stockItem.stock,
+            price: stockItem.price
+          });
+        }
+      });
+    });
+
+    res.json({
+      success: true,
+      data: results.slice(0, limit)
+    });
+  } catch (error) {
+    console.error('Search medicines error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
 // @route   GET /api/pharmacies/:id
 // @desc    Get pharmacy by ID
 // @access  Public
@@ -295,6 +419,9 @@ router.put('/:id/stock', [
     pharmacy.updateStock(medicine, stock, price);
     await pharmacy.save();
 
+    // Populate medicine data in stock items
+    await pharmacy.populate('stock.medicine', 'name genericName');
+
     res.json({
       success: true,
       message: 'Stock updated successfully',
@@ -302,108 +429,6 @@ router.put('/:id/stock', [
     });
   } catch (error) {
     console.error('Update stock error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
-  }
-});
-
-// @route   GET /api/pharmacies/search/medicines
-// @desc    Search medicines across pharmacies
-// @access  Public
-router.get('/search/medicines', [
-  query('q').trim().isLength({ min: 1 }).withMessage('Search query required'),
-  query('latitude').optional().isFloat(),
-  query('longitude').optional().isFloat(),
-  query('radius').optional().isFloat({ min: 0 }),
-  query('limit').optional().isInt({ min: 1, max: 50 })
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: errors.array()
-      });
-    }
-
-    const {
-      q,
-      latitude,
-      longitude,
-      radius = 10,
-      limit = 20
-    } = req.query;
-
-    let locationFilter = {};
-    if (latitude && longitude) {
-      locationFilter = {
-        location: {
-          $near: {
-            $geometry: {
-              type: 'Point',
-              coordinates: [parseFloat(longitude), parseFloat(latitude)]
-            },
-            $maxDistance: parseFloat(radius) * 1000
-          }
-        }
-      };
-    }
-
-    const pharmacies = await Pharmacy.find({
-      ...locationFilter,
-      isActive: true,
-      stock: {
-        $elemMatch: {
-          stock: { $gt: 0 },
-          medicine: {
-            $in: await Medicine.find({
-              $or: [
-                { name: { $regex: q, $options: 'i' } },
-                { genericName: { $regex: q, $options: 'i' } }
-              ],
-              isActive: true
-            }).distinct('_id')
-          }
-        }
-      }
-    })
-    .populate('stock.medicine', 'name genericName category requiresPrescription price')
-    .select('name address phone latitude longitude stock')
-    .limit(parseInt(limit));
-
-    // Filter and format results
-    const results = [];
-    pharmacies.forEach(pharmacy => {
-      pharmacy.stock.forEach(stockItem => {
-        if (stockItem.stock > 0 &&
-            (stockItem.medicine.name.toLowerCase().includes(q.toLowerCase()) ||
-             (stockItem.medicine.genericName && stockItem.medicine.genericName.toLowerCase().includes(q.toLowerCase())))) {
-          results.push({
-            pharmacy: {
-              _id: pharmacy._id,
-              name: pharmacy.name,
-              address: pharmacy.address,
-              phone: pharmacy.phone,
-              latitude: pharmacy.latitude,
-              longitude: pharmacy.longitude
-            },
-            medicine: stockItem.medicine,
-            stock: stockItem.stock,
-            price: stockItem.price
-          });
-        }
-      });
-    });
-
-    res.json({
-      success: true,
-      data: results.slice(0, limit)
-    });
-  } catch (error) {
-    console.error('Search medicines error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

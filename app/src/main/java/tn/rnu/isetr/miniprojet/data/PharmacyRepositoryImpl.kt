@@ -38,4 +38,22 @@ class PharmacyRepositoryImpl(private val apiService: ApiService = RetrofitClient
             Result.failure(Exception("Network error: ${e.localizedMessage}"))
         }
     }
+
+    override suspend fun getMedicines(): Result<List<Medicine>> {
+        return try {
+            val response = apiService.getMedicines()
+            if (response.isSuccessful) {
+                val medicineResponse = response.body()
+                if (medicineResponse?.success == true) {
+                    Result.success(medicineResponse.data ?: emptyList())
+                } else {
+                    Result.failure(Exception(medicineResponse?.message ?: "Failed to load medicines"))
+                }
+            } else {
+                Result.failure(Exception("Failed to load medicines: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("Network error: ${e.localizedMessage}"))
+        }
+    }
 }

@@ -173,17 +173,22 @@ pharmacySchema.methods.getMedicineStock = function(medicineId) {
 
 // Method to update medicine stock
 pharmacySchema.methods.updateStock = function(medicineId, newStock, newPrice = null) {
-  const stockItem = this.stock.find(item =>
+  const stockIndex = this.stock.findIndex(item =>
     item.medicine.toString() === medicineId.toString()
   );
 
-  if (stockItem) {
-    stockItem.stock = newStock;
-    if (newPrice !== null) {
-      stockItem.price = newPrice;
+  if (stockIndex !== -1) {
+    if (newStock <= 0) {
+      // Remove the medicine from stock if quantity is 0 or negative
+      this.stock.splice(stockIndex, 1);
+    } else {
+      this.stock[stockIndex].stock = newStock;
+      if (newPrice !== null) {
+        this.stock[stockIndex].price = newPrice;
+      }
+      this.stock[stockIndex].lastUpdated = new Date();
     }
-    stockItem.lastUpdated = new Date();
-  } else {
+  } else if (newStock > 0) {
     this.stock.push({
       medicine: medicineId,
       stock: newStock,

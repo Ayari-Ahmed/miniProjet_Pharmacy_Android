@@ -78,10 +78,10 @@ fun MiniProjetApp(preferencesManager: PreferencesManager) {
     var showPharmacyLogin by rememberSaveable { mutableStateOf(false) }
     var selectedPharmacy by rememberSaveable { mutableStateOf<Pharmacy?>(null) }
     var selectedOrder by rememberSaveable { mutableStateOf<Order?>(null) }
+    var currentPharmacy by rememberSaveable { mutableStateOf(preferencesManager.getPharmacy()) }
     var currentPharmacyScreen by rememberSaveable { mutableStateOf<PharmacyScreen?>(null) }
 
     val onLogout = {
-        preferencesManager.logout()
         isLoggedIn = false
         isPharmacyLoggedIn = false
         showLogin = true
@@ -89,7 +89,9 @@ fun MiniProjetApp(preferencesManager: PreferencesManager) {
         showPharmacyLogin = false
         selectedPharmacy = null
         selectedOrder = null
+        currentPharmacy = null
         currentPharmacyScreen = null
+        preferencesManager.logout()
     }
 
     // Handle order placement first (highest priority)
@@ -155,23 +157,30 @@ fun MiniProjetApp(preferencesManager: PreferencesManager) {
             )
         }
     } else if (isPharmacyLoggedIn) {
-        val pharmacy = preferencesManager.getPharmacy()
-        if (pharmacy != null) {
+        currentPharmacy = currentPharmacy ?: preferencesManager.getPharmacy()
+        if (currentPharmacy != null) {
             when (currentPharmacyScreen) {
                 PharmacyScreen.DASHBOARD -> PharmacyDashboardScreen(
-                    pharmacy = pharmacy,
+                    pharmacy = currentPharmacy!!,
                     preferencesManager = preferencesManager,
                     onNavigateToStock = { currentPharmacyScreen = PharmacyScreen.STOCK },
                     onNavigateToOrders = { currentPharmacyScreen = PharmacyScreen.ORDERS },
-                    onLogout = onLogout
+                    onLogout = onLogout,
+                    onRefreshPharmacy = { updatedPharmacy ->
+                        currentPharmacy = updatedPharmacy
+                        preferencesManager.savePharmacy(updatedPharmacy)
+                    }
                 )
                 PharmacyScreen.STOCK -> PharmacyStockScreen(
-                    pharmacy = pharmacy,
+                    initialPharmacy = currentPharmacy!!,
                     preferencesManager = preferencesManager,
-                    onNavigateBack = { currentPharmacyScreen = PharmacyScreen.DASHBOARD }
+                    onNavigateBack = { currentPharmacyScreen = PharmacyScreen.DASHBOARD },
+                    onPharmacyUpdated = { updatedPharmacy ->
+                        currentPharmacy = updatedPharmacy
+                    }
                 )
                 PharmacyScreen.ORDERS -> PharmacyOrdersScreen(
-                    pharmacy = pharmacy,
+                    pharmacy = currentPharmacy!!,
                     preferencesManager = preferencesManager,
                     onNavigateBack = { currentPharmacyScreen = PharmacyScreen.DASHBOARD }
                 )
@@ -179,11 +188,15 @@ fun MiniProjetApp(preferencesManager: PreferencesManager) {
                     // Default to dashboard if no screen is set
                     currentPharmacyScreen = PharmacyScreen.DASHBOARD
                     PharmacyDashboardScreen(
-                        pharmacy = pharmacy,
+                        pharmacy = currentPharmacy!!,
                         preferencesManager = preferencesManager,
                         onNavigateToStock = { currentPharmacyScreen = PharmacyScreen.STOCK },
                         onNavigateToOrders = { currentPharmacyScreen = PharmacyScreen.ORDERS },
-                        onLogout = onLogout
+                        onLogout = onLogout,
+                        onRefreshPharmacy = { updatedPharmacy ->
+                            currentPharmacy = updatedPharmacy
+                            preferencesManager.savePharmacy(updatedPharmacy)
+                        }
                     )
                 }
             }

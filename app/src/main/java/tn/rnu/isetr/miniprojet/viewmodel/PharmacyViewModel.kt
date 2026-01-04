@@ -15,6 +15,9 @@ class PharmacyViewModel : ViewModel() {
     private val _stockState = MutableStateFlow<StockState>(StockState.Idle)
     val stockState: StateFlow<StockState> = _stockState
 
+    private val _medicinesState = MutableStateFlow<MedicinesState>(MedicinesState.Idle)
+    val medicines: StateFlow<MedicinesState> = _medicinesState
+
     fun getPharmacies() {
         _pharmacyState.value = PharmacyState.Loading
         viewModelScope.launch {
@@ -62,8 +65,41 @@ class PharmacyViewModel : ViewModel() {
         _pharmacyState.value = PharmacyState.Idle
     }
 
-    fun resetStockState() {
-        _stockState.value = StockState.Idle
+    fun getMedicines() {
+        _medicinesState.value = MedicinesState.Loading
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.apiService.getMedicines()
+                if (response.isSuccessful) {
+                    val medicineResponse = response.body()
+                    if (medicineResponse?.success == true) {
+                        _medicinesState.value = MedicinesState.Success(medicineResponse.data ?: emptyList())
+                    } else {
+                        _medicinesState.value = MedicinesState.Error(medicineResponse?.message ?: "Failed to load medicines")
+                    }
+                } else {
+                    _medicinesState.value = MedicinesState.Error("Failed to load medicines: ${response.message()}")
+                }
+            } catch (e: Exception) {
+                _medicinesState.value = MedicinesState.Error("Network error: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun getPharmacy(id: String, onSuccess: (Pharmacy?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val response = RetrofitClient.apiService.getPharmacy(id)
+                if (response.isSuccessful) {
+                    val pharmacyResponse = response.body()
+                    if (pharmacyResponse?.success == true) {
+                        onSuccess(pharmacyResponse.data?.firstOrNull())
+                    }
+                }
+            } catch (e: Exception) {
+                // Handle error if needed
+            }
+        }
     }
 }
 
@@ -79,4 +115,11 @@ sealed class StockState {
     object Loading : StockState()
     data class Success(val stock: List<PharmacyStock>) : StockState()
     data class Error(val message: String) : StockState()
+}
+
+sealed class MedicinesState {
+    object Idle : MedicinesState()
+    object Loading : MedicinesState()
+    data class Success(val medicines: List<Medicine>) : MedicinesState()
+    data class Error(val message: String) : MedicinesState()
 }

@@ -11,6 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +22,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import tn.rnu.isetr.miniprojet.data.Pharmacy
 import tn.rnu.isetr.miniprojet.data.PreferencesManager
 import tn.rnu.isetr.miniprojet.viewmodel.OrderViewModel
@@ -33,16 +37,36 @@ fun PharmacyDashboardScreen(
     onNavigateToStock: () -> Unit,
     onNavigateToOrders: () -> Unit,
     onLogout: () -> Unit,
+    onRefreshPharmacy: (Pharmacy) -> Unit = {},
     orderViewModel: OrderViewModel = viewModel(),
     pharmacyViewModel: PharmacyViewModel = viewModel()
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullRefreshState = rememberPullToRefreshState()
+    val coroutineScope = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
+    fun refreshData() {
+        coroutineScope.launch {
+            isRefreshing = true
+            pharmacyViewModel.getPharmacy(pharmacy._id) { updatedPharmacy ->
+                updatedPharmacy?.let { onRefreshPharmacy(it) }
+            }
+            orderViewModel.getPharmacyOrders()
+            delay(1000) // Simulate refresh delay
+            isRefreshing = false
+        }
+    }
+
+    PullToRefreshBox(
+        state = pullRefreshState,
+        isRefreshing = isRefreshing,
+        onRefresh = { refreshData() }
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+        ) {
         // Compact Header
         Row(
             modifier = Modifier
@@ -78,6 +102,27 @@ fun PharmacyDashboardScreen(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(
+                    onClick = { refreshData() },
+                    enabled = !isRefreshing,
+                    modifier = Modifier
+                        .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color(0xFF64748B),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = Color(0xFF64748B)
+                        )
+                    }
+                }
                 IconButton(
                     onClick = onLogout,
                     modifier = Modifier
@@ -289,6 +334,7 @@ fun PharmacyDashboardScreen(
                     }
                 }
             }
+        }
         }
     }
 }

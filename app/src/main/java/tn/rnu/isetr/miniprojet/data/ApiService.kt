@@ -46,11 +46,17 @@ interface ApiService {
         @Query("page") page: Int = 1
     ): Response<PharmacyResponse>
 
+    @GET("pharmacies/{id}")
+    suspend fun getPharmacy(@Path("id") id: String): Response<PharmacyResponse>
+
+    @GET("pharmacies/medicines")
+    suspend fun getMedicines(): Response<MedicineListResponse>
+
     @PUT("pharmacies/{id}/stock")
     suspend fun updatePharmacyStock(
         @Path("id") pharmacyId: String,
         @Body request: UpdateStockRequest
-    ): Response<StockResponse>
+    ): Response<PharmacyStockResponse>
 
     @GET("orders/pharmacy/my-orders")
     suspend fun getPharmacyOrders(
