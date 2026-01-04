@@ -2,6 +2,8 @@ package tn.rnu.isetr.miniprojet.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,13 +21,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import tn.rnu.isetr.miniprojet.data.Customer
 import tn.rnu.isetr.miniprojet.data.Order
 import tn.rnu.isetr.miniprojet.data.Pharmacy
 import tn.rnu.isetr.miniprojet.data.PreferencesManager
 import tn.rnu.isetr.miniprojet.viewmodel.OrderViewModel
 import tn.rnu.isetr.miniprojet.viewmodel.OrderState
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PharmacyOrdersScreen(
     pharmacy: Pharmacy,
@@ -198,29 +200,13 @@ fun PharmacyEmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, ti
 
 @Composable
 fun PharmacyOrderCard(order: Order, onStatusUpdate: (String) -> Unit) {
-    // Pharmacy can only update to: confirmed, processing, ready
-    val pharmacyAllowedStatuses = listOf("confirmed", "processing", "ready")
-    val currentIndex = pharmacyAllowedStatuses.indexOf(order.status)
-    val nextStatus = if (currentIndex >= 0 && currentIndex < pharmacyAllowedStatuses.size - 1) {
-        pharmacyAllowedStatuses[currentIndex + 1]
-    } else if (order.status == "ready") {
-        "confirmed" // Cycle back for completed orders
-    } else {
-        pharmacyAllowedStatuses[0] // Default to confirmed
-    }
-
-    val buttonText = when (nextStatus) {
-        "confirmed" -> "Confirm"
-        "processing" -> "Process"
-        "ready" -> "Ready"
-        else -> "Update"
-    }
+    var showDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F5F9))
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9))
     ) {
         Row(
             modifier = Modifier
@@ -294,8 +280,13 @@ fun PharmacyOrderCard(order: Order, onStatusUpdate: (String) -> Unit) {
                     }
                 }
 
+                val customerDisplay = when (order.customer) {
+                    is String -> (order.customer as String).takeLast(8)
+                    is Customer -> (order.customer as Customer).name ?: "Unknown"
+                    else -> "Unknown"
+                }
                 Text(
-                    text = "Customer: ${order.customer?.takeLast(8) ?: "Unknown"}",
+                    text = "Customer: $customerDisplay",
                     fontSize = 13.sp,
                     color = Color(0xFF64748B),
                     fontWeight = FontWeight.Medium,
@@ -313,21 +304,60 @@ fun PharmacyOrderCard(order: Order, onStatusUpdate: (String) -> Unit) {
 
             // Status update button
             Button(
-                onClick = { onStatusUpdate(nextStatus) },
+                onClick = { showDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
-                    .width(80.dp)
+                    .width(100.dp)
                     .height(36.dp),
-                border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF1E40AF))
+                border = BorderStroke(2.dp, Color(0xFF1E40AF))
             ) {
                 Text(
-                    text = buttonText,
+                    text = "Update",
                     color = Color.White,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Update Order Status") },
+            text = {
+                Column {
+                    val statuses = listOf("confirmed", "processing", "ready")
+                    statuses.forEach { status ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onStatusUpdate(status)
+                                    showDialog = false
+                                }
+                                .padding(8.dp)
+                        ) {
+                            RadioButton(
+                                selected = order.status == status,
+                                onClick = {
+                                    onStatusUpdate(status)
+                                    showDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(status.replaceFirstChar { it.uppercase() })
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

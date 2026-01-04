@@ -24,8 +24,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import tn.rnu.isetr.miniprojet.data.Order
 import tn.rnu.isetr.miniprojet.data.Pharmacy
 import tn.rnu.isetr.miniprojet.data.PreferencesManager
+import tn.rnu.isetr.miniprojet.viewmodel.OrderState
 import tn.rnu.isetr.miniprojet.viewmodel.OrderViewModel
 import tn.rnu.isetr.miniprojet.viewmodel.PharmacyViewModel
 
@@ -44,6 +46,12 @@ fun PharmacyDashboardScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     val pullRefreshState = rememberPullToRefreshState()
     val coroutineScope = rememberCoroutineScope()
+    val orderState by orderViewModel.orderState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        // Load pharmacy orders on screen entry
+        orderViewModel.getPharmacyOrders()
+    }
 
     fun refreshData() {
         coroutineScope.launch {
@@ -142,6 +150,7 @@ fun PharmacyDashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
+                .padding(top = 16.dp)
         ) {
             // Pharmacy Info Card
             Card(
@@ -331,6 +340,207 @@ fun PharmacyDashboardScreen(
                             color = Color.White.copy(alpha = 0.9f),
                             fontWeight = FontWeight.Medium
                         )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Recent Orders Section
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Recent Orders",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1E293B),
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    when (orderState) {
+                        is OrderState.OrdersLoaded -> {
+                            val orders =
+                                (orderState as OrderState.OrdersLoaded).orders.take(3) // Show last 3 orders
+                            if (orders.isEmpty()) {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = Color(
+                                            0xFFF8FAFC
+                                        )
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(20.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ShoppingCart,
+                                            contentDescription = null,
+                                            tint = Color(0xFF94A3B8),
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "No orders yet",
+                                            fontSize = 16.sp,
+                                            color = Color(0xFF64748B)
+                                        )
+                                    }
+                                }
+                            } else {
+                                for (order in orders) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 12.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            Color(0xFFF1F5F9)
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // Order icon with status color
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .background(
+                                                        color = when (order.status) {
+                                                            "pending" -> Color(0xFFFCD34D)
+                                                            "confirmed" -> Color(0xFF3B82F6)
+                                                            "preparing" -> Color(0xFFF59E0B)
+                                                            "ready" -> Color(0xFF10B981)
+                                                            "delivered" -> Color(0xFF059669)
+                                                            "cancelled" -> Color(0xFFEF4444)
+                                                            else -> Color(0xFF6B7280)
+                                                        },
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.ShoppingCart,
+                                                    contentDescription = "Order",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.width(12.dp))
+
+                                            // Order details
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "Order #${order._id.takeLast(6)}",
+                                                    fontSize = 16.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF1E293B)
+                                                )
+                                                Text(
+                                                    text = "${order.items.size} items • ${
+                                                        String.format(
+                                                            "%.2f",
+                                                            order.totalAmount
+                                                        )
+                                                    } DT",
+                                                    fontSize = 14.sp,
+                                                    color = Color(0xFF64748B)
+                                                )
+                                                Text(
+                                                    text = order.status.replaceFirstChar { it.uppercase() },
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = when (order.status) {
+                                                        "pending" -> Color(0xFFD97706)
+                                                        "confirmed" -> Color(0xFF2563EB)
+                                                        "preparing" -> Color(0xFFD97706)
+                                                        "ready" -> Color(0xFF059669)
+                                                        "delivered" -> Color(0xFF059669)
+                                                        "cancelled" -> Color(0xFFDC2626)
+                                                        else -> Color(0xFF6B7280)
+                                                    }
+                                                )
+                                            }
+
+                                            // Arrow
+                                            Icon(
+                                                Icons.Default.ArrowForward,
+                                                contentDescription = "View order",
+                                                tint = Color(0xFFCBD5E1)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        is OrderState.Loading -> {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(20.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = Color(0xFF3B82F6)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Loading orders...",
+                                        fontSize = 16.sp,
+                                        color = Color(0xFF64748B)
+                                    )
+                                }
+                            }
+                        }
+
+                        is OrderState.Error -> {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFEE2E2))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(20.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color(0xFFDC2626),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Failed to load orders",
+                                        fontSize = 16.sp,
+                                        color = Color(0xFFDC2626)
+                                    )
+                                }
+                            }
+                        }
+
+                        else -> {}
                     }
                 }
             }

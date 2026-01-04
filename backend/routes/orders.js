@@ -673,8 +673,11 @@ router.put('/:id/pharmacy-status', [
 
     await order.populate([
       { path: 'customer', select: 'name phone' },
-      { path: 'pharmacy', select: 'name address phone' }
+      { path: 'pharmacy', select: 'name address phone' },
+      { path: 'items.medicine', select: 'name genericName' }
     ]);
+
+    console.log('Order after populate:', JSON.stringify(order, null, 2));
 
     res.json({
       success: true,

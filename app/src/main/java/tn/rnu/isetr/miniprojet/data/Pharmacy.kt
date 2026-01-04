@@ -27,18 +27,6 @@ data class PharmacyStock(
     val lastUpdated: String? = null
 ) : Parcelable
 
-@Parcelize
-data class Medicine(
-    val _id: String,
-    val name: String,
-    val genericName: String? = null,
-    val description: String? = null,
-    val category: String? = null,
-    val requiresPrescription: Boolean = false,
-    val price: Double = 0.0,
-    val imageUrl: String? = null
-) : Parcelable
-
 data class PharmacyResponse(
     val success: Boolean,
     val data: List<Pharmacy>,
